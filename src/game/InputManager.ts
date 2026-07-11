@@ -13,6 +13,16 @@ export interface InputCallbacks {
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLButtonElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
 export class InputManager {
   private pointerId: number | null = null;
   private keyboardAngle = 0;
@@ -74,6 +84,7 @@ export class InputManager {
   };
 
   private readonly keyDown = (event: KeyboardEvent): void => {
+    if (isInteractiveTarget(event.target)) return;
     if (event.repeat && event.code === 'Space') return;
     const angleStep = Math.PI / 4;
     if (event.code === 'ArrowLeft' || event.code === 'KeyA') this.keyboardAngle -= angleStep;

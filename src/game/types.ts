@@ -69,8 +69,9 @@ export interface ScoreEntry {
 }
 
 export interface SavedProgress {
-  version: 1;
+  version: 2;
   unlockedLevel: number;
-  totalBest: number | null;
+  bestRound: number | null;
+  combinedHoleBests: number | null;
   scores: ScoreEntry[];
 }

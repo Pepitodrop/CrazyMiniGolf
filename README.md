@@ -17,7 +17,7 @@ A complete nine-hole, top-down browser minigolf game whose authoritative state t
 - Brainfuck execution in a Web Worker with tape, output and step limits
 - Deterministic Vitest suite and GitHub Actions CI
 - R simulations for solvability estimates, expected strokes and par suggestions
-- Isolated TrumpScript-compatible commentary and alternative result labels
+- Expanded TrumpScript-compatible feature rules for commentary, level tips, cosmetic themes, optional challenges, persistent style points, medals, round titles and hidden Easter eggs
 
 ## Languages and responsibilities
 
@@ -27,7 +27,7 @@ A complete nine-hole, top-down browser minigolf game whose authoritative state t
 | **TypeScript**                        | Brainfuck interpreter, worker transport, packet conversion, browser input, Canvas rendering, arbitrary level geometry sensors, audio, UI, errors and Local Storage                                                                                                      |
 | **HTML/CSS**                          | Responsive application shell, HUD, controls and retro presentation                                                                                                                                                                                                      |
 | **R**                                 | Offline shot simulation, coarse solvability checks, expected-stroke estimates, suggested par and CSV/JSON/PNG output                                                                                                                                                    |
-| **TrumpScript compatibility grammar** | Non-critical commentator phrases and non-authoritative grades                                                                                                                                                                                                           |
+| **TrumpScript compatibility grammar** | Non-critical commentary, tactical tips, cosmetic themes, optional challenge conditions, persistent style awards, medals, round titles and Easter eggs                                                                                                                   |
 | **Node.js/Vite**                      | Development server, test/build tooling and production bundling                                                                                                                                                                                                          |
 
 ## Honest Brainfuck boundary
@@ -107,6 +107,18 @@ npm run test
 npm run test:coverage
 ```
 
+## TrumpScript feature rules
+
+`src/trumpscript/commentator.tr` now defines more than commentary. It declaratively configures per-level tips and colors, optional challenge conditions, one-time style-point awards, medals, level/round labels and hidden Easter eggs. A small compatibility controller observes the game’s existing event stream and rendered level/power values to build a read-only summary containing strokes, par, bounces, shot count and power usage.
+
+Example:
+
+```text
+CHALLENGE wall-street LEVEL 4 TITLE "Wall Street" WHEN BOUNCES_AT_LEAST 1 AND PAR_OR_BETTER AWARD 175 SAY "The bank shot paid a tremendous dividend."
+```
+
+These rewards are intentionally separate from the real golf score and use a separate namespaced Local Storage record. The controller injects only optional briefing, medal and bonus UI; no changes to `Game.ts` or the Brainfuck protocol are required. A TrumpScript parser failure disables the optional feature layer while Brainfuck gameplay remains usable. See [`src/trumpscript/README.md`](src/trumpscript/README.md).
+
 ## R analysis
 
 Install R 4.2+ and `jsonlite`:
@@ -165,7 +177,7 @@ docs/              architecture, protocol and development notes
 - The physics deliberately snaps to eight directions and uses integer magnitudes rather than continuous floating-point vectors.
 - Geometry intersection is calculated in TypeScript and represented to Brainfuck as axis sensor bits; Brainfuck performs the authoritative response.
 - Highscores are local to the current browser profile. There is no remote account or server leaderboard.
-- The TrumpScript component is a documented compatibility subset, not the abandoned original runtime.
+- The TrumpScript component is a documented compatibility subset, not the abandoned original runtime. Its optional rules cannot alter strokes, physics, level progression or authoritative highscores.
 - The R solver is stochastic but deterministically seeded and may miss a path that a human can find.
 - Audio starts only after user interaction because of browser autoplay policies.
 

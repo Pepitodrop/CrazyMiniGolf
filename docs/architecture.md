@@ -27,7 +27,7 @@ Pointer / touch / keyboard
 - **TypeScript:** browser APIs, worker transport, interpreter safety, input quantization, level-shape sensor generation, Canvas rendering, audio, menus, errors and persistence.
 - **JSON:** declarative dimensions, start/hole coordinates, rectangular/circular obstacles and par.
 - **R:** offline simulation and balancing against the same discrete model.
-- **TrumpScript compatibility layer:** isolated commentary and non-authoritative result grades.
+- **TrumpScript compatibility layer:** isolated commentary, tips, validated themes, optional challenge evaluation, one-time style awards, medals, round titles and hidden Easter eggs. Its controller observes the existing public game event/UI stream, owns only its namespaced persistence and optional injected panels, and cannot change authoritative game state.
 
 ## Physics model
 

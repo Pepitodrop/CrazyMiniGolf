@@ -39,6 +39,6 @@ The compatibility runtime now controls:
 - hidden Easter eggs
 - level and round result titles
 
-TypeScript supplies a read-only gameplay summary after a level: strokes, par, bounces, shot count, maximum/final power and diagonal-shot count. The runtime evaluates only its declarative rules and returns presentation metadata.
+The browser-side compatibility controller observes only the existing `START`, `HIT`, `BOUNCE`, `HOLE`, `ACE` and `FINAL` events plus the already rendered level/power values. It builds a read-only summary containing strokes, par, bounces, shot count and power usage, then evaluates the declarative rules.
 
-It cannot access the DOM, network, Local Storage, Brainfuck tape or authoritative score. A parser or rule error disables these optional features without changing physics, level progression or the real stroke result.
+The controller may add its own optional DOM panels and use the namespaced `crazy-mini-golf-trump-features-v1` Local Storage key for style points and medals. It has no network access and cannot write to the Brainfuck tape, alter strokes, unlock levels or modify authoritative highscores. A parser or controller failure leaves the core game usable.

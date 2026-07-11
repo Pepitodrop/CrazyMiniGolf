@@ -5,6 +5,8 @@ analysis/results/*.csv
 analysis/results/*.json
 analysis/results/*.png
 .env
+.env.*
+!.env.example
 .DS_Store
 
 *.tsbuildinfo

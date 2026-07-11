@@ -19,7 +19,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run audit
-      - run: npm run format:check
+      - name: Check formatting
+        run: |
+          if ! npm run format:check; then
+            npx prettier --list-different . | tee prettier-different.txt
+            exit 1
+          fi
+      - name: Upload formatting diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettier-different
+          path: prettier-different.txt
+          retention-days: 1
       - run: npm run lint
       - run: npm run check:engine
       - run: npm run validate:levels

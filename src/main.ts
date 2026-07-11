@@ -1,9 +1,11 @@
 import './ui/styles.css';
 import commentatorSource from './trumpscript/commentator.tr?raw';
+import tremendousFunctionSource from './trumpscript/tremendous-function.tr?raw';
 import { Game } from './game/Game';
 import { LevelManager } from './game/LevelManager';
 import type { CommentaryEvent } from './trumpscript/runtime';
 import { createTrumpRuntime } from './trumpscript/runtime';
+import { createTrumpSpeechFunction } from './trumpscript/speechFunction';
 import { loadProgress, recordLevelScore, resetProgress, saveProgress } from './storage/scores';
 import type { EngineState, LevelDefinition } from './game/types';
 
@@ -109,12 +111,22 @@ const levels = new LevelManager();
 let progress = loadProgress();
 const sessionScores = new Map<number, { strokes: number; par: number }>();
 let currentState: EngineState | null = null;
+let pendingTrumpSpeech: string | null = null;
 
 let trumpRuntime: ReturnType<typeof createTrumpRuntime> | null = null;
 try {
   trumpRuntime = createTrumpRuntime(commentatorSource);
 } catch (error) {
   commentator.textContent = `Commentary disabled: ${error instanceof Error ? error.message : 'parser error'}`;
+}
+
+let trumpSpeech: ReturnType<typeof createTrumpSpeechFunction> | null = null;
+try {
+  trumpSpeech = createTrumpSpeechFunction(tremendousFunctionSource);
+} catch (error) {
+  console.warn(
+    `TrumpScript speech function disabled: ${error instanceof Error ? error.message : 'parser error'}`,
+  );
 }
 
 function totalRelativeToPar(state: EngineState, level: LevelDefinition): string {
@@ -149,6 +161,11 @@ function renderProgress(): void {
 
 function showComment(event: CommentaryEvent): void {
   const message = trumpRuntime?.comment(event, Date.now() + (currentState?.strokes ?? 0));
+  if ((event === 'HOLE' || event === 'ACE') && pendingTrumpSpeech) {
+    commentator.textContent = [pendingTrumpSpeech, message].filter(Boolean).join(' — ');
+    pendingTrumpSpeech = null;
+    return;
+  }
   if (message) commentator.textContent = message;
 }
 
@@ -178,8 +195,9 @@ const game = new Game(canvas, levels, 1, {
     sessionScores.set(level.id, { strokes, par: level.par });
     progress = recordLevelScore(progress, level.id, strokes, level.par);
     saveProgress(progress);
-    const grade = trumpRuntime?.grade(strokes, level.par);
-    if (grade) commentator.textContent = `${grade} — ${commentator.textContent}`;
+    const grade = trumpRuntime?.grade(strokes, level.par) ?? '';
+    const speech = trumpSpeech?.invoke({ strokes, par: level.par }) ?? '';
+    pendingTrumpSpeech = [grade, speech].filter(Boolean).join(' — ');
     renderProgress();
   },
   onFinalComplete(strokes) {
@@ -206,6 +224,7 @@ audioToggle.addEventListener('change', () => game.setAudioEnabled(audioToggle.ch
 resetProgressButton.addEventListener('click', () => {
   progress = resetProgress();
   sessionScores.clear();
+  pendingTrumpSpeech = null;
   renderProgress();
   commentator.textContent = 'Save data reset. Level one is unlocked.';
   void game.selectLevel(1);

@@ -1,86 +1,45 @@
-name: Apply reviewed production code
+name: CI
 
 on:
+  push:
+    branches: [main, 'agent/**']
   pull_request:
-    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
-    if: github.head_ref == 'agent/apply-final-production-code'
+  web:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run audit
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run check:engine
+      - run: npm run validate:levels
+      - run: npm run test:coverage
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
-      - id: patch
-        name: Apply reviewed source
-        run: |
-          set -o pipefail
-          git checkout origin/main -- .github/workflows/ci.yml
-          cat .reviewed-production/part-* > /tmp/reviewed.patch
-          git apply --check /tmp/reviewed.patch 2>&1 | tee /tmp/patch.log
-          git apply --index /tmp/reviewed.patch 2>&1 | tee -a /tmp/patch.log
-          install -m 0644 .reviewed-production/main.ts src/main.ts
-          install -m 0644 .reviewed-production/trumpFeatures.ts src/storage/trumpFeatures.ts
-          install -m 0644 .reviewed-production/speechFunction.ts src/trumpscript/speechFunction.ts
-          install -m 0644 .reviewed-production/tremendous-function.tr src/trumpscript/tremendous-function.tr
-          install -m 0644 .reviewed-production/trump-speech-function.test.ts tests/trump-speech-function.test.ts
-          rm -rf .reviewed-production
-
-      - id: dependencies
-        name: Install and audit dependencies
-        run: |
-          set -o pipefail
-          npm install --package-lock-only --ignore-scripts 2>&1 | tee /tmp/dependencies.log
-          npm ci 2>&1 | tee -a /tmp/dependencies.log
-          npm run audit 2>&1 | tee -a /tmp/dependencies.log
-
-      - id: quality
-        name: Run production quality gates
-        run: |
-          set -o pipefail
-          npm run generate:engine 2>&1 | tee /tmp/quality.log
-          npm run format 2>&1 | tee -a /tmp/quality.log
-          npm run lint 2>&1 | tee -a /tmp/quality.log
-          npm run check:engine 2>&1 | tee -a /tmp/quality.log
-          npm run validate:levels 2>&1 | tee -a /tmp/quality.log
-          npm run test:coverage 2>&1 | tee -a /tmp/quality.log
-          npm run build 2>&1 | tee -a /tmp/quality.log
-          rm -f .github/workflows/apply-production-review.yml
-          rm -f .github/workflows/apply-reviewed-fix.yml
-          rm -f production-review-status.txt
-
-      - name: Commit reviewed production code
-        if: success()
-        run: |
-          git checkout HEAD -- .github/workflows/ci.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "fix: merge reviewed production-ready state"
-          git push origin HEAD:${{ github.head_ref }}
-
-      - name: Collect failure diagnostics
-        if: failure()
-        run: |
-          mkdir -p /tmp/production-diagnostics
-          for log in /tmp/patch.log /tmp/dependencies.log /tmp/quality.log; do
-            if [ -f "$log" ]; then cp "$log" /tmp/production-diagnostics/; fi
-          done
-          git status --short > /tmp/production-diagnostics/git-status.txt
-
-      - uses: actions/upload-artifact@v4
-        if: failure()
+  r-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
         with:
-          name: production-apply-diagnostics
-          path: /tmp/production-diagnostics
-          retention-days: 1
+          r-version: '4.4'
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: any::jsonlite
+      - run: Rscript analysis/analyze-levels.R src/levels/levels.json analysis/results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: level-analysis
+          path: analysis/results

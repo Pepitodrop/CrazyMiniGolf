@@ -52,13 +52,16 @@ export function calculateCollisionSensors(
   const yWall = nextY - level.ballRadius < 0 || nextY + level.ballRadius > level.height;
   const xObstacle = collidesWithAnyObstacle(level, xPoint);
   const yObstacle = collidesWithAnyObstacle(level, yPoint);
-  const blockX = velocityX > 0 && (xWall || xObstacle);
-  const blockY = velocityY > 0 && (yWall || yObstacle);
+  const diagonalObstacle =
+    velocityX > 0 && velocityY > 0 && collidesWithAnyObstacle(level, { x: nextX, y: nextY });
+  const blockX = velocityX > 0 && (xWall || xObstacle || diagonalObstacle);
+  const blockY = velocityY > 0 && (yWall || yObstacle || diagonalObstacle);
 
   return {
     blockX,
     blockY,
-    collisionKind: xWall || yWall ? 'wall' : xObstacle || yObstacle ? 'obstacle' : 'none',
+    collisionKind:
+      xWall || yWall ? 'wall' : xObstacle || yObstacle || diagonalObstacle ? 'obstacle' : 'none',
   };
 }
 

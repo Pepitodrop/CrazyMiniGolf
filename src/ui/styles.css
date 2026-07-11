@@ -327,3 +327,7 @@ footer a {
     margin-top: 0.5rem;
   }
 }
+
+.commentator.warning {
+  color: var(--yellow);
+}

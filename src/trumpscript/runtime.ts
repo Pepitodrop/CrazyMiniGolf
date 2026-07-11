@@ -43,10 +43,20 @@ export interface TrumpFeature {
   message: string;
 }
 
+export interface TrumpRuntimeCompletion {
+  grade: string;
+  awards: TrumpFeature[];
+  saved: boolean;
+}
+
 export interface TrumpRuntime {
   comment(event: CommentaryEvent, seed?: number): string;
   grade(strokes: number, par: number): string;
   roundTitle(strokes: number, par: number): string;
+  startLevel(levelId: number): void;
+  recordShot(shot: { strength: number; diagonal: boolean }): void;
+  recordBounce(): void;
+  completeLevel(levelId: number, strokes: number, par: number): TrumpRuntimeCompletion;
   tip(levelId: number): string;
   theme(levelId: number): TrumpTheme | null;
   challenges(levelId: number): TrumpFeature[];
@@ -256,22 +266,33 @@ export function createTrumpRuntime(source: string): TrumpRuntime {
           evaluate: evaluateFeatures,
           getFeature: (id) => features.get(id) ?? null,
           describe: describeFeature,
-          roundTitle: roundResult,
         });
 
   return {
     comment(event, seed = Date.now()): string {
-      const override = controller?.recordEvent(event);
-      if (override) return override;
       const choices = comments.get(event) ?? [];
       if (choices.length === 0) return '';
       return choices[Math.abs(seed) % choices.length] ?? choices[0] ?? '';
     },
-    grade(strokes, par): string {
-      controller?.completeLevel(strokes, par);
-      return gradeResult(strokes, par);
-    },
+    grade: gradeResult,
     roundTitle: roundResult,
+    startLevel(levelId): void {
+      controller?.startLevel(levelId);
+    },
+    recordShot(shot): void {
+      controller?.recordShot(shot);
+    },
+    recordBounce(): void {
+      controller?.recordBounce();
+    },
+    completeLevel(levelId, strokes, par): TrumpRuntimeCompletion {
+      const result = controller?.completeLevel(levelId, strokes, par);
+      return {
+        grade: gradeResult(strokes, par),
+        awards: result?.awards ?? [],
+        saved: result?.saved ?? true,
+      };
+    },
     tip(levelId): string {
       return tips.get(levelId) ?? '';
     },

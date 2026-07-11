@@ -48,15 +48,18 @@ simulate_single_shot <- function(level, state, direction, strength, max_ticks = 
     next_x <- x + sx * vx
     next_y <- y + sy * vy
 
+    diagonal_obstacle <- vx > 0 && vy > 0 && obstacle_collision(level, next_x, next_y)
     block_x <- vx > 0 && (
       next_x - level$ballRadius < 0 ||
       next_x + level$ballRadius > level$width ||
-      obstacle_collision(level, next_x, y)
+      obstacle_collision(level, next_x, y) ||
+      diagonal_obstacle
     )
     block_y <- vy > 0 && (
       next_y - level$ballRadius < 0 ||
       next_y + level$ballRadius > level$height ||
-      obstacle_collision(level, x, next_y)
+      obstacle_collision(level, x, next_y) ||
+      diagonal_obstacle
     )
 
     if (block_x) sx <- -sx else x <- next_x
@@ -128,7 +131,7 @@ analyze_level <- function(level, trials = 120) {
     success_rate = round(success_rate, 3),
     expected_strokes = ifelse(is.na(expected), NA, round(expected, 2)),
     obstacle_count = length(level$obstacles),
-    principally_solvable = success_rate > 0,
+    coarse_solver_found_path = success_rate > 0,
     stringsAsFactors = FALSE
   )
 }

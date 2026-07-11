@@ -36,6 +36,11 @@ describe('TrumpScript tremendous speech function', () => {
         'MAKE FUNCTION bad GREAT AGAIN WITH STROKES AND PAR SAY "The number is {SECRET}."',
       ),
     ).toThrow(/Unsupported TrumpScript speech placeholder/);
+    expect(() =>
+      createTrumpSpeechFunction(
+        'MAKE FUNCTION bad GREAT AGAIN WITH STROKES AND PAR SAY "The number is {secret}."',
+      ),
+    ).toThrow(/Unsupported TrumpScript speech placeholder/);
   });
 
   it('rejects invalid score inputs without touching game state', () => {

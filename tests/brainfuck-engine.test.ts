@@ -90,6 +90,23 @@ describe('Brainfuck game engine', () => {
     expect(result.levelComplete).toBe(true);
   });
 
+  it('does not advance beyond maxLevel', () => {
+    const state = { ...createInitialState(9, { x: 20, y: 20 }), levelComplete: true, inHole: true };
+    const result = execute({ state, advance: true, maxLevel: 9 });
+    expect(result.level).toBe(9);
+  });
+
+  it('saturates the stroke counter instead of wrapping after 255', () => {
+    const state = { ...createInitialState(1, { x: 20, y: 20 }), strokes: 255 };
+    const result = execute({
+      state,
+      aim: { xActive: true, xNegative: false, yActive: false, yNegative: false, strength: 5 },
+      strike: true,
+      maxLevel: 9,
+    });
+    expect(result.strokes).toBe(255);
+  });
+
   it('advances through all nine level ids deterministically', () => {
     let state = createInitialState(1, { x: 24, y: 75 });
     for (let level = 2; level <= 9; level += 1) {

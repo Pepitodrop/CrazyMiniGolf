@@ -5,11 +5,15 @@ import {
   saveTrumpFeatureProgress,
   type TrumpFeatureProgress,
 } from '../storage/trumpFeatures';
-import type { CommentaryEvent, TrumpFeature, TrumpGameplayContext, TrumpTheme } from './runtime';
+import type { TrumpFeature, TrumpGameplayContext, TrumpTheme } from './runtime';
 
 const DEFAULT_ACCENT = '#56d89b';
 const DEFAULT_SECONDARY = '#fff48f';
-const ROUND_PAR = 41;
+
+export interface TrumpCompletionResult {
+  awards: TrumpFeature[];
+  saved: boolean;
+}
 
 export interface TrumpFeatureControllerOptions {
   tip(levelId: number): string;
@@ -18,7 +22,6 @@ export interface TrumpFeatureControllerOptions {
   evaluate(context: TrumpGameplayContext): TrumpFeature[];
   getFeature(id: string): TrumpFeature | null;
   describe(feature: TrumpFeature): string;
-  roundTitle(strokes: number, par: number): string;
 }
 
 const FEATURE_CSS = `
@@ -62,52 +65,40 @@ function initialTelemetry(levelId: number): TrumpGameplayContext {
 export class TrumpFeatureController {
   private progress: TrumpFeatureProgress = loadTrumpFeatureProgress();
   private telemetry = initialTelemetry(1);
-  private pendingAwards: TrumpFeature[] = [];
   private bonusTimer: number | null = null;
   private mounted = false;
 
   constructor(private readonly options: TrumpFeatureControllerOptions) {
-    queueMicrotask(() => this.mount());
+    if (typeof queueMicrotask === 'function') queueMicrotask(() => this.mount());
   }
 
-  recordEvent(event: CommentaryEvent): string | null {
-    if (event === 'START') {
-      queueMicrotask(() => this.syncLevel(true));
-      return null;
-    }
-
-    const levelId = this.readLevelId();
-    if (levelId !== this.telemetry.levelId) this.telemetry = initialTelemetry(levelId);
-
-    if (event === 'HIT') {
-      const power = this.readPower();
-      this.telemetry.shots += 1;
-      this.telemetry.lastPower = power;
-      this.telemetry.maxPowerUsed = Math.max(this.telemetry.maxPowerUsed, power);
-    } else if (event === 'BOUNCE') {
-      this.telemetry.bounces += 1;
-    } else if (event === 'HOLE' || event === 'ACE') {
-      const award = this.pendingAwards[0];
-      this.pendingAwards = [];
-      if (award) return `${award.message} +${award.points} style.`;
-    } else if (event === 'FINAL') {
-      const total = this.readRoundTotal();
-      if (total !== null) return `${this.options.roundTitle(total, ROUND_PAR)} — ${total} strokes.`;
-    }
-    return null;
+  startLevel(levelId: number): void {
+    this.telemetry = initialTelemetry(levelId);
+    this.applyTheme(levelId);
+    this.render();
   }
 
-  completeLevel(strokes: number, par: number): TrumpFeature[] {
-    this.telemetry.levelId = this.readLevelId();
+  recordShot(shot: { strength: number; diagonal: boolean }): void {
+    this.telemetry.shots += 1;
+    this.telemetry.lastPower = shot.strength;
+    this.telemetry.maxPowerUsed = Math.max(this.telemetry.maxPowerUsed, shot.strength);
+    if (shot.diagonal) this.telemetry.diagonalShots += 1;
+  }
+
+  recordBounce(): void {
+    this.telemetry.bounces += 1;
+  }
+
+  completeLevel(levelId: number, strokes: number, par: number): TrumpCompletionResult {
+    if (this.telemetry.levelId !== levelId) this.telemetry = initialTelemetry(levelId);
     this.telemetry.strokes = strokes;
     this.telemetry.par = par;
     const result = recordTrumpAwards(this.progress, this.options.evaluate(this.telemetry));
     this.progress = result.progress;
-    this.pendingAwards = result.newlyUnlocked;
-    saveTrumpFeatureProgress(this.progress);
+    const saved = saveTrumpFeatureProgress(this.progress);
     this.showAwards(result.newlyUnlocked);
     this.render();
-    return result.newlyUnlocked;
+    return { awards: result.newlyUnlocked, saved };
   }
 
   private mount(): void {
@@ -161,23 +152,16 @@ export class TrumpFeatureController {
 
     document.querySelector('#reset-progress')?.addEventListener('click', () => {
       this.progress = resetTrumpFeatureProgress();
-      this.pendingAwards = [];
       this.render();
     });
 
-    this.syncLevel(true);
-  }
-
-  private syncLevel(reset: boolean): void {
-    const levelId = this.readLevelId();
-    if (reset || levelId !== this.telemetry.levelId) this.telemetry = initialTelemetry(levelId);
-    this.applyTheme(levelId);
+    this.applyTheme(this.telemetry.levelId);
     this.render();
   }
 
   private render(): void {
-    if (!this.mounted) return;
-    const levelId = this.readLevelId();
+    if (!this.mounted || typeof document === 'undefined') return;
+    const levelId = this.telemetry.levelId;
     const stylePoints = document.querySelector('#trump-style-points');
     if (stylePoints) stylePoints.textContent = String(this.progress.stylePoints);
 
@@ -232,7 +216,8 @@ export class TrumpFeatureController {
   }
 
   private showAwards(awards: TrumpFeature[]): void {
-    if (awards.length === 0 || typeof window === 'undefined') return;
+    if (awards.length === 0 || typeof window === 'undefined' || typeof document === 'undefined')
+      return;
     const banner = document.querySelector<HTMLElement>('#trump-bonus-banner');
     if (!banner) return;
     if (this.bonusTimer !== null) window.clearTimeout(this.bonusTimer);
@@ -255,26 +240,9 @@ export class TrumpFeatureController {
   }
 
   private applyTheme(levelId: number): void {
+    if (typeof document === 'undefined') return;
     const theme = this.options.theme(levelId);
     document.documentElement.style.setProperty('--accent', theme?.accent ?? DEFAULT_ACCENT);
     document.documentElement.style.setProperty('--yellow', theme?.secondary ?? DEFAULT_SECONDARY);
-  }
-
-  private readLevelId(): number {
-    const text = document.querySelector('#hud-level')?.textContent ?? '1';
-    const parsed = Number.parseInt(text, 10);
-    return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
-  }
-
-  private readPower(): number {
-    const text = document.querySelector('#hud-power')?.textContent ?? '0';
-    const parsed = Number.parseInt(text, 10);
-    return Number.isInteger(parsed) ? parsed : 0;
-  }
-
-  private readRoundTotal(): number | null {
-    const text = document.querySelector<HTMLElement>('#commentator')?.dataset.final ?? '';
-    const match = /(\d+)/u.exec(text);
-    return match ? Number(match[1]) : null;
   }
 }

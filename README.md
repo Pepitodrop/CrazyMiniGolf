@@ -17,7 +17,7 @@ A complete nine-hole, top-down browser minigolf game whose authoritative state t
 - Brainfuck execution in a Web Worker with tape, output and step limits
 - Deterministic Vitest suite and GitHub Actions CI
 - R simulations for solvability estimates, expected strokes and par suggestions
-- Expanded TrumpScript-compatible feature rules for commentary, level tips, cosmetic themes, optional challenges, persistent style points, medals, round titles and hidden Easter eggs
+- Expanded TrumpScript-compatible feature rules for commentary, level tips, cosmetic themes, optional challenges, persistent style points, medals, round titles, hidden Easter eggs and an executable post-hole speech function
 
 ## Languages and responsibilities
 
@@ -65,7 +65,11 @@ npm run dev               # development server
 npm run build             # strict TypeScript check and production bundle
 npm run preview           # serve the production bundle locally
 npm run test              # deterministic test suite
-npm run test:coverage     # tests with V8 coverage
+npm run test:coverage     # tests with enforced V8 coverage thresholds
+npm run test:e2e         # Chromium production-build smoke tests
+npm run generate:engine  # regenerate the canonical Brainfuck kernel
+npm run check:engine     # verify engine.bf matches its generator
+npm run audit            # fail on high-severity dependency advisories
 npm run lint              # ESLint typed rules
 npm run format            # write Prettier formatting
 npm run format:check      # verify formatting
@@ -76,7 +80,7 @@ npm run analyze:levels    # run R balancing analysis
 ## Production build
 
 ```bash
-npm install
+npm ci
 npm run build
 npm run preview
 ```
@@ -98,26 +102,34 @@ The suite covers:
 - Deterministic progression across all nine levels
 - Local highscore persistence and better-score replacement
 - Level schema validity
-- TrumpScript compatibility parsing and result grading
+- TrumpScript parsing, typed shot/bounce telemetry, challenges and persistent medals
+- Game orchestration, including final-tick hole capture and continuous nine-level totals
+- Worker-client timeouts, audio fallback, Canvas rendering and keyboard/pointer input
+- Blocked Local Storage as a non-fatal browser condition
 
 Run:
 
 ```bash
 npm run test
 npm run test:coverage
+npm run build
+npm run test:e2e
 ```
 
 ## TrumpScript feature rules
 
-`src/trumpscript/commentator.tr` now defines more than commentary. It declaratively configures per-level tips and colors, optional challenge conditions, one-time style-point awards, medals, level/round labels and hidden Easter eggs. A small compatibility controller observes the game’s existing event stream and rendered level/power values to build a read-only summary containing strokes, par, bounces, shot count and power usage.
+`src/trumpscript/commentator.tr` now defines more than commentary. It declaratively configures per-level tips and colors, optional challenge conditions, one-time style-point awards, medals, level/round labels and hidden Easter eggs. A small compatibility controller receives typed, read-only level, shot and bounce telemetry from `Game`. It never reconstructs gameplay data from the DOM. The summary contains strokes, par, bounces, shot count, maximum/final power and diagonal-shot count.
 
-Example:
+Examples:
 
 ```text
 CHALLENGE wall-street LEVEL 4 TITLE "Wall Street" WHEN BOUNCES_AT_LEAST 1 AND PAR_OR_BETTER AWARD 175 SAY "The bank shot paid a tremendous dividend."
+MAKE FUNCTION tremendous-deal GREAT AGAIN WITH STROKES AND PAR SAY "We had {STROKES} strokes and the tremendous number is {TREMENDOUS_NUMBER}."
 ```
 
-These rewards are intentionally separate from the real golf score and use a separate namespaced Local Storage record. The controller injects only optional briefing, medal and bonus UI; no changes to `Game.ts` or the Brainfuck protocol are required. A TrumpScript parser failure disables the optional feature layer while Brainfuck gameplay remains usable. See [`src/trumpscript/README.md`](src/trumpscript/README.md).
+The speech function is parsed from `src/trumpscript/tremendous-function.tr` and runs after each completed hole. It can read only strokes and par, substitute an allowlisted set of placeholders and return commentary. It cannot mutate the Brainfuck state, scores, physics or persistence.
+
+These rewards are intentionally separate from the real golf score and use a separate namespaced Local Storage record. The controller injects only optional briefing, medal and bonus UI. Its typed callbacks are separate from the Brainfuck protocol and cannot mutate authoritative game state. A TrumpScript parser failure disables the optional feature layer while Brainfuck gameplay remains usable. See [`src/trumpscript/README.md`](src/trumpscript/README.md).
 
 ## R analysis
 
@@ -155,7 +167,7 @@ InputManager ──► Game ──► geometry sensors ──► 32-byte packet
                        Renderer · HUD · Audio · Local Storage
 ```
 
-The interpreter defaults to a 96-byte tape, 350,000 executed commands and 32 output bytes per engine invocation. Any violation becomes a visible engine error instead of freezing the browser.
+The worker compiles the generated Brainfuck kernel once, then reuses it with a 96-byte tape, 350,000 executed commands and 32 output bytes per engine invocation. Any violation becomes a visible engine error instead of freezing the browser.
 
 ## Repository structure
 
@@ -166,8 +178,8 @@ src/levels/        nine declarative levels and runtime validation
 src/storage/       local progress and highscore persistence
 src/trumpscript/   isolated compatibility grammar and parser
 analysis/          R simulation and generated results
-scripts/           level validation and R launcher
-tests/             interpreter, engine, physics, storage and data tests
+scripts/           deterministic Brainfuck generation, level validation and R launcher
+tests/             unit, integration and Chromium smoke tests
 docs/              architecture, protocol and development notes
 .github/workflows/ continuous integration
 ```
@@ -176,9 +188,10 @@ docs/              architecture, protocol and development notes
 
 - The physics deliberately snaps to eight directions and uses integer magnitudes rather than continuous floating-point vectors.
 - Geometry intersection is calculated in TypeScript and represented to Brainfuck as axis sensor bits; Brainfuck performs the authoritative response.
-- Highscores are local to the current browser profile. There is no remote account or server leaderboard.
+- Highscores are local to the current browser profile. Storage failures are reported as non-fatal warnings; there is no remote account or server leaderboard.
+- The Brainfuck stroke counter saturates at 255 to preserve its one-byte protocol field instead of wrapping to zero.
 - The TrumpScript component is a documented compatibility subset, not the abandoned original runtime. Its optional rules cannot alter strokes, physics, level progression or authoritative highscores.
-- The R solver is stochastic but deterministically seeded and may miss a path that a human can find.
+- The R solver is stochastic but deterministically seeded; `coarse_solver_found_path` records only whether that solver found a route and is not a proof of solvability.
 - Audio starts only after user interaction because of browser autoplay policies.
 
 ## Browser support

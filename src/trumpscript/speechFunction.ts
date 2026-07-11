@@ -10,14 +10,8 @@ export interface TrumpSpeechFunction {
 
 const FUNCTION_PATTERN =
   /^MAKE\s+FUNCTION\s+([a-z0-9-]+)\s+GREAT\s+AGAIN\s+WITH\s+STROKES\s+AND\s+PAR\s+SAY\s+"([^"]+)"$/u;
-const PLACEHOLDER_PATTERN = /\{([A-Z_]+)\}/gu;
-const ALLOWED_PLACEHOLDERS = new Set([
-  'STROKES',
-  'PAR',
-  'MARGIN',
-  'RESULT',
-  'TREMENDOUS_NUMBER',
-]);
+const PLACEHOLDER_PATTERN = /\{([^{}]+)\}/gu;
+const ALLOWED_PLACEHOLDERS = new Set(['STROKES', 'PAR', 'MARGIN', 'RESULT', 'TREMENDOUS_NUMBER']);
 
 function assertScore(value: number, label: string, minimum: number): void {
   if (!Number.isInteger(value) || value < minimum || value > 9999) {
@@ -27,7 +21,9 @@ function assertScore(value: number, label: string, minimum: number): void {
 
 function describeResult(strokes: number, par: number): string {
   if (strokes < par) return 'a landslide victory, possibly the biggest victory in mini golf';
-  if (strokes === par) return 'a tie, which everybody who understands deals knows is basically a victory';
+  if (strokes === par) {
+    return 'a tie, which everybody who understands deals knows is basically a victory';
+  }
   return 'a temporary negotiation with the course, because the course was frankly very unfair';
 }
 
@@ -44,7 +40,9 @@ export function createTrumpSpeechFunction(source: string): TrumpSpeechFunction {
     .filter((line) => line.length > 0 && !line.startsWith('#'));
 
   if (statements.length !== 1) {
-    throw new Error('A TrumpScript speech function file must contain exactly one function statement.');
+    throw new Error(
+      'A TrumpScript speech function file must contain exactly one function statement.',
+    );
   }
 
   const match = FUNCTION_PATTERN.exec(statements[0] ?? '');

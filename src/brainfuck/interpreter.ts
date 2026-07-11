@@ -11,6 +11,11 @@ export interface BrainfuckRunResult {
   steps: number;
 }
 
+export interface CompiledBrainfuck {
+  program: string;
+  jumps: ReadonlyMap<number, number>;
+}
+
 export class BrainfuckError extends Error {
   constructor(
     message: string,
@@ -23,7 +28,7 @@ export class BrainfuckError extends Error {
 
 const COMMANDS = new Set(['>', '<', '+', '-', '.', ',', '[', ']']);
 
-export function compileBrainfuck(source: string): { program: string; jumps: Map<number, number> } {
+export function compileBrainfuck(source: string): CompiledBrainfuck {
   const program = [...source].filter((character) => COMMANDS.has(character)).join('');
   const stack: number[] = [];
   const jumps = new Map<number, number>();
@@ -47,19 +52,26 @@ export function compileBrainfuck(source: string): { program: string; jumps: Map<
   return { program, jumps };
 }
 
-export function runBrainfuck(
-  source: string,
+export function runCompiledBrainfuck(
+  compiled: CompiledBrainfuck,
   input: Uint8Array = new Uint8Array(),
   options: BrainfuckRunOptions = {},
 ): BrainfuckRunResult {
   const tapeSize = options.tapeSize ?? 128;
   const stepLimit = options.stepLimit ?? 500_000;
   const outputLimit = options.outputLimit ?? 256;
-  if (tapeSize < 1 || stepLimit < 1 || outputLimit < 1) {
+  if (
+    !Number.isInteger(tapeSize) ||
+    !Number.isInteger(stepLimit) ||
+    !Number.isInteger(outputLimit) ||
+    tapeSize < 1 ||
+    stepLimit < 1 ||
+    outputLimit < 1
+  ) {
     throw new RangeError('Brainfuck limits must be positive integers.');
   }
 
-  const { program, jumps } = compileBrainfuck(source);
+  const { program, jumps } = compiled;
   const tape = new Uint8Array(tapeSize);
   const output: number[] = [];
   let pointer = 0;
@@ -122,4 +134,12 @@ export function runBrainfuck(
   }
 
   return { output: Uint8Array.from(output), tape, pointer, steps };
+}
+
+export function runBrainfuck(
+  source: string,
+  input: Uint8Array = new Uint8Array(),
+  options: BrainfuckRunOptions = {},
+): BrainfuckRunResult {
+  return runCompiledBrainfuck(compileBrainfuck(source), input, options);
 }

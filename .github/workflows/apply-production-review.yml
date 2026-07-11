@@ -28,6 +28,7 @@ jobs:
           node-version: 20
       - name: Apply reviewed source
         run: |
+          # The staged patch was restored byte-for-byte before this gate runs.
           cat .reviewed-production/part-* > /tmp/reviewed.patch
           git apply --check /tmp/reviewed.patch
           git apply --index /tmp/reviewed.patch

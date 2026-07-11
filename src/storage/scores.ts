@@ -7,10 +7,18 @@ export interface StorageLike {
   setItem(key: string, value: string): void;
 }
 
+interface LegacyProgress {
+  version: 1;
+  unlockedLevel?: unknown;
+  totalBest?: unknown;
+  scores?: unknown;
+}
+
 export const emptyProgress = (): SavedProgress => ({
-  version: 1,
+  version: 2,
   unlockedLevel: 1,
-  totalBest: null,
+  bestRound: null,
+  combinedHoleBests: null,
   scores: [],
 });
 
@@ -22,33 +30,61 @@ function browserStorage(): StorageLike | null {
   }
 }
 
+function validScoreEntries(value: unknown): ScoreEntry[] {
+  if (!Array.isArray(value)) return [];
+  const entries = value.filter(
+    (entry): entry is ScoreEntry =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      Number.isInteger((entry as ScoreEntry).levelId) &&
+      (entry as ScoreEntry).levelId >= 1 &&
+      (entry as ScoreEntry).levelId <= 9 &&
+      Number.isInteger((entry as ScoreEntry).bestStrokes) &&
+      (entry as ScoreEntry).bestStrokes >= 0 &&
+      Number.isInteger((entry as ScoreEntry).par) &&
+      (entry as ScoreEntry).par > 0,
+  );
+  return [...new Map(entries.map((entry) => [entry.levelId, entry])).values()].sort(
+    (a, b) => a.levelId - b.levelId,
+  );
+}
+
+function validOptionalScore(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.round(value)
+    : null;
+}
+
 export function loadProgress(storage: StorageLike | null = browserStorage()): SavedProgress {
   try {
     if (!storage) return emptyProgress();
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return emptyProgress();
-    const parsed = JSON.parse(raw) as Partial<SavedProgress>;
-    if (parsed.version !== 1 || !Array.isArray(parsed.scores)) return emptyProgress();
-    return {
-      version: 1,
-      unlockedLevel: Math.max(1, Math.min(9, Number(parsed.unlockedLevel) || 1)),
-      totalBest:
-        typeof parsed.totalBest === 'number' && Number.isFinite(parsed.totalBest)
-          ? Math.max(0, Math.round(parsed.totalBest))
-          : null,
-      scores: parsed.scores.filter(
-        (entry): entry is ScoreEntry =>
-          typeof entry === 'object' &&
-          entry !== null &&
-          Number.isInteger(entry.levelId) &&
-          entry.levelId >= 1 &&
-          entry.levelId <= 9 &&
-          Number.isInteger(entry.bestStrokes) &&
-          entry.bestStrokes >= 0 &&
-          Number.isInteger(entry.par) &&
-          entry.par > 0,
-      ),
-    };
+    const parsed = JSON.parse(raw) as Partial<SavedProgress> | LegacyProgress;
+    const scores = validScoreEntries(parsed.scores);
+    const unlockedLevel = Math.max(1, Math.min(9, Number(parsed.unlockedLevel) || 1));
+
+    if (parsed.version === 2) {
+      return {
+        version: 2,
+        unlockedLevel,
+        bestRound: validOptionalScore(parsed.bestRound),
+        combinedHoleBests: validOptionalScore(parsed.combinedHoleBests),
+        scores,
+      };
+    }
+
+    if (parsed.version === 1) {
+      return {
+        version: 2,
+        unlockedLevel,
+        bestRound: null,
+        combinedHoleBests: validOptionalScore(parsed.totalBest),
+        scores,
+      };
+    }
+
+    return emptyProgress();
   } catch {
     return emptyProgress();
   }
@@ -81,16 +117,29 @@ export function recordLevelScore(
           : entry,
       )
     : [...progress.scores, { levelId, bestStrokes: strokes, par }];
-  const uniqueScores = [...new Map(scores.map((entry) => [entry.levelId, entry])).values()];
-  const allNine = uniqueScores.length === 9;
-  const total = uniqueScores.reduce((sum, entry) => sum + entry.bestStrokes, 0);
+  const uniqueScores = [...new Map(scores.map((entry) => [entry.levelId, entry])).values()].sort(
+    (a, b) => a.levelId - b.levelId,
+  );
+  const combinedHoleBests =
+    uniqueScores.length === 9
+      ? uniqueScores.reduce((sum, entry) => sum + entry.bestStrokes, 0)
+      : progress.combinedHoleBests;
+
   return {
-    version: 1,
+    ...progress,
+    version: 2,
     unlockedLevel: Math.min(9, Math.max(progress.unlockedLevel, levelId + 1)),
-    scores: uniqueScores.sort((a, b) => a.levelId - b.levelId),
-    totalBest: allNine
-      ? Math.min(progress.totalBest ?? Number.POSITIVE_INFINITY, total)
-      : progress.totalBest,
+    scores: uniqueScores,
+    combinedHoleBests,
+  };
+}
+
+export function recordRoundScore(progress: SavedProgress, strokes: number): SavedProgress {
+  if (!Number.isInteger(strokes) || strokes < 0) return progress;
+  return {
+    ...progress,
+    version: 2,
+    bestRound: Math.min(progress.bestRound ?? Number.POSITIVE_INFINITY, strokes),
   };
 }
 

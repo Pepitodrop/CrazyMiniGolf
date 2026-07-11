@@ -1,4 +1,6 @@
-# Crazy Mini Golf isolated TrumpScript-compatible commentary rules.
+# Crazy Mini Golf isolated TrumpScript-compatible rules.
+# It controls commentary, cosmetic themes, tips, optional challenges, style points and Easter eggs.
+
 WHEN START SAY "Welcome to the course. It is going to be tremendous."
 WHEN START SAY "Nine holes. Very classy. Absolutely no fake physics."
 WHEN HIT SAY "A powerful shot. Maybe the most powerful shot ever."
@@ -9,7 +11,45 @@ WHEN HOLE SAY "In the hole. Total victory."
 WHEN HOLE SAY "A winning putt. The leaderboard loves it."
 WHEN ACE SAY "Hole in one. Historic. Possibly unprecedented."
 WHEN FINAL SAY "All nine completed. We made mini golf great again."
+
 GRADE ACE AS "TREMENDOUS"
 GRADE UNDER_PAR AS "WINNING"
 GRADE PAR AS "VERY SOLID"
 GRADE OVER_PAR AS "NEEDS A BETTER DEAL"
+ROUND UNDER_PAR AS "LANDSLIDE VICTORY"
+ROUND PAR AS "A PERFECTLY BALANCED DEAL"
+ROUND OVER_PAR AS "A COMEBACK CAMPAIGN"
+
+TIP LEVEL 1 SAY "Keep the first deal simple: aim east and learn how power decays."
+TIP LEVEL 2 SAY "The center block can be avoided cleanly or used for a controlled rebound."
+TIP LEVEL 3 SAY "The central lane rewards accurate horizontal shots."
+TIP LEVEL 4 SAY "A bank shot along the upper rail is often the strongest route."
+TIP LEVEL 5 SAY "Use the open pockets between blocks instead of forcing one giant shot."
+TIP LEVEL 6 SAY "Offset gates favor one diagonal setup shot followed by a straight finish."
+TIP LEVEL 7 SAY "Read the maze backwards from the hole and choose a route before striking."
+TIP LEVEL 8 SAY "Circular obstacles create less predictable axis rebounds; leave margin."
+TIP LEVEL 9 SAY "The finale rewards deliberate bounces and controlled final power."
+
+THEME LEVEL 1 ACCENT "#56d89b" SECONDARY "#fff48f"
+THEME LEVEL 2 ACCENT "#55c2ff" SECONDARY "#ffdc7a"
+THEME LEVEL 3 ACCENT "#8ee3ef" SECONDARY "#ff8fab"
+THEME LEVEL 4 ACCENT "#f4a261" SECONDARY "#ffe66d"
+THEME LEVEL 5 ACCENT "#c77dff" SECONDARY "#72efdd"
+THEME LEVEL 6 ACCENT "#ff70a6" SECONDARY "#70d6ff"
+THEME LEVEL 7 ACCENT "#90be6d" SECONDARY "#f9c74f"
+THEME LEVEL 8 ACCENT "#00f5d4" SECONDARY "#fee440"
+THEME LEVEL 9 ACCENT "#ff4d6d" SECONDARY "#ffd166"
+
+CHALLENGE opening-deal LEVEL 1 TITLE "Opening Deal" WHEN NO_BOUNCE AND STROKES_AT_MOST 2 AWARD 100 SAY "A clean opening deal with no wall negotiations."
+CHALLENGE block-broker LEVEL 2 TITLE "Block Broker" WHEN BOUNCES_AT_LEAST 1 AND PAR_OR_BETTER AWARD 125 SAY "You used the obstacle and still closed at par or better."
+CHALLENGE corridor-control LEVEL 3 TITLE "Corridor Control" WHEN NO_BOUNCE AND STROKES_AT_MOST 3 AWARD 140 SAY "The narrow corridor was handled with total control."
+CHALLENGE wall-street LEVEL 4 TITLE "Wall Street" WHEN BOUNCES_AT_LEAST 1 AND PAR_OR_BETTER AWARD 175 SAY "The bank shot paid a tremendous dividend."
+CHALLENGE maximum-energy LEVEL 5 TITLE "Maximum Energy" WHEN MAX_POWER AND PAR_OR_BETTER AWARD 180 SAY "Maximum power, disciplined result. Very strong numbers."
+CHALLENGE needle-deal LEVEL 6 TITLE "Needle Deal" WHEN DIAGONAL_SHOTS_AT_LEAST 1 AND STROKES_AT_MOST 5 AWARD 190 SAY "You threaded the gates with a diagonal negotiation."
+CHALLENGE maze-majority LEVEL 7 TITLE "Maze Majority" WHEN BOUNCES_AT_LEAST 2 AND STROKES_AT_MOST 6 AWARD 220 SAY "Multiple rebounds and still a decisive maze victory."
+CHALLENGE bounce-buffer LEVEL 8 TITLE "Bounce Buffer" WHEN DIAGONAL_SHOTS_AT_LEAST 2 AND PAR_OR_BETTER AWARD 240 SAY "Two diagonal shots secured a very efficient buffer."
+CHALLENGE final-deal LEVEL 9 TITLE "Final Deal" WHEN BOUNCES_AT_LEAST 2 AND PAR_OR_BETTER AWARD 300 SAY "The final course was closed with rebounds and discipline."
+CHALLENGE tremendous-ace LEVEL ANY TITLE "Tremendous Ace" WHEN ACE AWARD 250 SAY "A historic hole in one has entered the record."
+CHALLENGE full-send LEVEL ANY TITLE "Full Send" WHEN MAX_POWER AWARD 60 SAY "Maximum power was deployed. The crowd noticed."
+
+EASTER covfefe-protocol LEVEL 9 TITLE "Covfefe Protocol" WHEN LAST_POWER 13 AND BOUNCES_AT_LEAST 3 AWARD 500 SAY "The hidden Covfefe protocol has been activated. Nobody knows how, but it worked."

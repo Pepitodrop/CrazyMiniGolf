@@ -29,7 +29,7 @@ jobs:
       - name: Apply reviewed source
         run: |
           cat .reviewed-production/part-* > /tmp/reviewed.patch
-          echo "a2f50b81aa2c32dc76b58201567b9e5e83f71275c7af326d2fc0988ae8d6f93f  /tmp/reviewed.patch" | sha256sum -c -
+          git apply --check /tmp/reviewed.patch
           git apply --index /tmp/reviewed.patch
           install -m 0644 .reviewed-production/main.ts src/main.ts
           install -m 0644 .reviewed-production/trumpFeatures.ts src/storage/trumpFeatures.ts

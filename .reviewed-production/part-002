@@ -1,0 +1,174 @@
+ng-point physics.
+diff --git a/docs/development.md b/docs/development.md
+index cc475e4..8e011eb 100644
+--- a/docs/development.md
++++ b/docs/development.md
+@@ -9,12 +9,15 @@
+ ## Commands
+ 
+ ```bash
+-npm install
++npm ci
+ npm run dev
+ npm run build
+ npm run preview
+ npm run test
+ npm run test:coverage
++npm run test:e2e
++npm run check:engine
++npm run audit
+ npm run lint
+ npm run format:check
+ npm run validate:levels
+@@ -27,8 +30,8 @@ The release intentionally contains exactly nine levels. Edit `src/levels/levels.
+ 
+ ## Engine changes
+ 
+-`engine.bf` contains only canonical commands plus safe alphabetic comments. Any punctuation that is itself a Brainfuck command would execute, so do not add decorative punctuation to the source header. Update the tape map, protocol documentation and fixed-vector tests with every packet change.
++`engine.bf` is generated deterministically from `scripts/generate-brainfuck-engine.ts`. Edit the generator, run `npm run generate:engine`, then update the tape map, protocol documentation and fixed-vector tests. CI runs `npm run check:engine` and fails if the checked-in kernel differs from the generator output.
+ 
+ ## Extending TrumpScript features
+ 
+-Edit `src/trumpscript/commentator.tr` and keep all rules inside the documented compatibility grammar. Challenge and Easter-egg conditions are combined with `AND`; IDs must remain unique. Themes accept only six-digit hexadecimal colors. Keep rules limited to telemetry the compatibility controller can observe reliably: strokes, par, HIT count, BOUNCE count and power usage. Run `npm run test`, `npm run lint` and `npm run build` after changes.
++Edit `src/trumpscript/commentator.tr` and keep all rules inside the documented compatibility grammar. Challenge and Easter-egg conditions are combined with `AND`; IDs must remain unique. Themes accept only six-digit hexadecimal colors. Keep rules limited to typed telemetry supplied by `Game`: strokes, par, shot count, bounce count, power usage and diagonal-shot count. Run `npm run test`, `npm run lint` and `npm run build` after changes.
+diff --git a/docs/protocol.md b/docs/protocol.md
+index de9b28e..60487b1 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -22,7 +22,7 @@ An invocation may contain one or more orthogonal flags, although the game normal
+ |  1–2 | ball X/Y                       |
+ |  3–6 | X/Y speed magnitudes and signs |
+ |    7 | strength                       |
+-|    8 | stroke count                   |
++|    8 | stroke count, saturated at 255 |
+ |    9 | collision status               |
+ |   10 | moving value                   |
+ |   11 | hole status                    |
+@@ -30,4 +30,4 @@ An invocation may contain one or more orthogonal flags, although the game normal
+ |   13 | error code                     |
+ |   14 | reserved                       |
+ 
+-The decoder rejects packets with any other length. The worker limits execution to 350,000 commands, 96 tape cells and 32 output bytes.
++The decoder rejects packets with any other length. `maxLevel` is enforced by Brainfuck during advancement, and the one-byte stroke field saturates rather than wrapping. The worker limits execution to 350,000 commands, 96 tape cells and 32 output bytes.
+diff --git a/index.html b/index.html
+index 61782cf..a369152 100644
+--- a/index.html
++++ b/index.html
+@@ -4,6 +4,10 @@
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+     <meta name="theme-color" content="#09111f" />
++    <link
++      rel="icon"
++      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22><text y=%22.9em%22 font-size=%2290%22>⛳</text></svg>"
++    />
+     <meta
+       name="description"
+       content="Crazy Mini Golf – neun Retro-Bahnen mit Brainfuck-Spielengine"
+diff --git a/package.json b/package.json
+index eb3cceb..3363915 100644
+--- a/package.json
++++ b/package.json
+@@ -14,21 +14,29 @@
+     "format": "prettier --write .",
+     "format:check": "prettier --check .",
+     "validate:levels": "tsx scripts/validate-levels.ts",
+-    "analyze:levels": "bash scripts/run-analysis.sh"
++    "analyze:levels": "bash scripts/run-analysis.sh",
++    "generate:engine": "tsx scripts/generate-brainfuck-engine.ts",
++    "check:engine": "tsx scripts/generate-brainfuck-engine.ts --check",
++    "test:e2e": "playwright test",
++    "test:all": "npm run test:coverage && npm run test:e2e",
++    "audit": "npm audit --audit-level=high"
+   },
+   "devDependencies": {
+-    "@eslint/js": "^9.31.0",
+-    "@types/node": "^24.0.15",
+-    "@vitest/coverage-v8": "^3.2.4",
+-    "eslint": "^9.31.0",
+-    "eslint-config-prettier": "^10.1.8",
+-    "globals": "^16.3.0",
+-    "prettier": "^3.6.2",
+-    "tsx": "^4.20.3",
+-    "typescript": "^5.8.3",
+-    "typescript-eslint": "^8.38.0",
+-    "vite": "^7.0.6",
+-    "vitest": "^3.2.4"
++    "@eslint/js": "9.39.5",
++    "@playwright/test": "1.61.1",
++    "@types/jsdom": "21.1.7",
++    "@types/node": "24.13.3",
++    "@vitest/coverage-v8": "3.2.7",
++    "eslint": "9.39.5",
++    "eslint-config-prettier": "10.1.8",
++    "globals": "16.5.0",
++    "jsdom": "26.1.0",
++    "prettier": "3.9.5",
++    "tsx": "4.23.0",
++    "typescript": "5.9.3",
++    "typescript-eslint": "8.63.0",
++    "vite": "7.3.6",
++    "vitest": "3.2.7"
+   },
+   "engines": {
+     "node": ">=20"
+diff --git a/playwright.config.ts b/playwright.config.ts
+new file mode 100644
+index 0000000..19daaab
+--- /dev/null
++++ b/playwright.config.ts
+@@ -0,0 +1,26 @@
++import { defineConfig, devices } from '@playwright/test';
++
++export default defineConfig({
++  testDir: './tests/e2e',
++  fullyParallel: false,
++  retries: process.env.CI ? 1 : 0,
++  reporter: process.env.CI ? 'github' : 'list',
++  use: {
++    baseURL: 'http://127.0.0.1:4173',
++    trace: 'retain-on-failure',
++    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
++      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
++      : undefined,
++  },
++  projects: [
++    {
++      name: 'chromium',
++      use: { ...devices['Desktop Chrome'] },
++    },
++  ],
++  webServer: {
++    command: 'npm run preview -- --host 127.0.0.1 --port 4173',
++    url: 'http://127.0.0.1:4173',
++    reuseExistingServer: !process.env.CI,
++  },
++});
+diff --git a/scripts/generate-brainfuck-engine.ts b/scripts/generate-brainfuck-engine.ts
+new file mode 100644
+index 0000000..2359cd5
+--- /dev/null
++++ b/scripts/generate-brainfuck-engine.ts
+@@ -0,0 +1,328 @@
++import { existsSync, readFileSync, writeFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++
++class BrainfuckBuilder {
++  private pointer = 0;
++  private readonly chunks: string[] = [];
++
++  get code(): string {
++    return this.chunks.join('');
++  }
++
++  at(cell: number): void {
++    const distance = cell - this.pointer;
++    this.chunks.push(distance >= 0 ? '>'.repeat(distance) : '<'.repeat(-distance));
++    this.pointer = cell;
++  }
++
++  raw(code: string): void {
++    this.chunks.push(code);
++  }
++
++  clear(cell: numbe

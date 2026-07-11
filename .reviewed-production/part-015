@@ -1,0 +1,141 @@
+def' }),
++      challenges: () => [feature],
++      evaluate,
++      getFeature: (id) => (id === feature.id ? feature : null),
++      describe: () => 'use one diagonal shot',
++    });
++    await Promise.resolve();
++
++    controller.startLevel(2);
++    controller.recordShot({ strength: 14, diagonal: true });
++    controller.recordBounce();
++    const result = controller.completeLevel(2, 3, 4);
++
++    expect(captured).toMatchObject({
++      levelId: 2,
++      strokes: 3,
++      par: 4,
++      shots: 1,
++      bounces: 1,
++      maxPowerUsed: 14,
++      lastPower: 14,
++      diagonalShots: 1,
++    });
++    expect(result.awards).toEqual([feature]);
++    expect(result.saved).toBe(true);
++    expect(document.querySelector('#trump-style-points')?.textContent).toBe('75');
++    expect(document.querySelector('.trump-challenge')?.classList.contains('complete')).toBe(true);
++    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#123456');
++  });
++});
+diff --git a/tests/trump-features-storage.test.ts b/tests/trump-features-storage.test.ts
+index 96b6775..012252e 100644
+--- a/tests/trump-features-storage.test.ts
++++ b/tests/trump-features-storage.test.ts
+@@ -38,6 +38,16 @@ describe('TrumpScript feature persistence', () => {
+     expect(second.newlyUnlocked).toHaveLength(0);
+   });
+ 
++  it('returns false instead of throwing when medal storage is unavailable', () => {
++    const storage: TrumpFeatureStorageLike = {
++      getItem: () => null,
++      setItem: () => {
++        throw new Error('blocked');
++      },
++    };
++    expect(saveTrumpFeatureProgress(emptyTrumpFeatureProgress(), storage)).toBe(false);
++  });
++
+   it('persists style points and unique medals', () => {
+     const storage = new MemoryStorage();
+     const result = recordTrumpAwards(emptyTrumpFeatureProgress(), [award('a', 40), award('b', 60)]);
+diff --git a/tests/worker.test.ts b/tests/worker.test.ts
+new file mode 100644
+index 0000000..59d734a
+--- /dev/null
++++ b/tests/worker.test.ts
+@@ -0,0 +1,32 @@
++import { describe, expect, it } from 'vitest';
++import {
++  createInitialState,
++  decodeEngineOutput,
++  encodeEngineCommand,
++} from '../src/brainfuck/protocol';
++import { executeEngineRequest } from '../src/brainfuck/worker';
++
++describe('Brainfuck worker execution', () => {
++  it('executes the precompiled engine with the configured safety limits', () => {
++    const output = executeEngineRequest(
++      encodeEngineCommand({
++        state: createInitialState(1, { x: 24, y: 75 }),
++        aim: {
++          xActive: true,
++          xNegative: false,
++          yActive: false,
++          yNegative: false,
++          strength: 8,
++        },
++        strike: true,
++        maxLevel: 9,
++      }),
++    ).output;
++
++    expect(decodeEngineOutput(output)).toMatchObject({
++      level: 1,
++      velocityX: 8,
++      strokes: 1,
++    });
++  });
++});
+diff --git a/tsconfig.node.json b/tsconfig.node.json
+index 6d9b7fb..9525e16 100644
+--- a/tsconfig.node.json
++++ b/tsconfig.node.json
+@@ -17,6 +17,9 @@
+     "scripts/**/*.ts",
+     "src/levels/schema.ts",
+     "src/levels/levels.json",
+-    "src/game/types.ts"
++    "src/game/types.ts",
++    "src/game/collision.ts",
++    "vitest.config.ts",
++    "playwright.config.ts"
+   ]
+ }
+diff --git a/vite.config.ts b/vite.config.ts
+index 042fc09..30629a9 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -4,7 +4,7 @@ export default defineConfig({
+   base: './',
+   build: {
+     target: 'es2022',
+-    sourcemap: true,
++    sourcemap: false,
+   },
+   worker: {
+     format: 'es',
+diff --git a/vitest.config.ts b/vitest.config.ts
+new file mode 100644
+index 0000000..1f433ca
+--- /dev/null
++++ b/vitest.config.ts
+@@ -0,0 +1,18 @@
++import { defineConfig } from 'vitest/config';
++
++export default defineConfig({
++  test: {
++    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
++    coverage: {
++      provider: 'v8',
++      include: ['src/**/*.ts'],
++      exclude: ['src/main.ts', 'src/vite-env.d.ts', 'src/**/types.ts'],
++      thresholds: {
++        statements: 75,
++        branches: 65,
++        functions: 70,
++        lines: 75,
++      },
++    },
++  },
++});

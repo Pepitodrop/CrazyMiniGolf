@@ -25,6 +25,7 @@ jobs:
         name: Apply reviewed source
         run: |
           set -o pipefail
+          git checkout origin/main -- .github/workflows/ci.yml
           cat .reviewed-production/part-* > /tmp/reviewed.patch
           git apply --check /tmp/reviewed.patch 2>&1 | tee /tmp/patch.log
           git apply --index /tmp/reviewed.patch 2>&1 | tee -a /tmp/patch.log

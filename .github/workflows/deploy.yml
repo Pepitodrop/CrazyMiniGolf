@@ -92,7 +92,7 @@ jobs:
     steps:
       - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       - name: Verify public deployment
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}

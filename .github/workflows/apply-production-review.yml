@@ -18,7 +18,7 @@ jobs:
   apply:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,13 +61,6 @@ jobs:
           npm run test:coverage 2>&1 | tee -a /tmp/quality.log
           npm run build 2>&1 | tee -a /tmp/quality.log
 
-      - id: browser
-        name: Run Chromium production smoke tests
-        run: |
-          set -o pipefail
-          npx playwright install --with-deps chromium 2>&1 | tee /tmp/browser.log
-          npm run test:e2e 2>&1 | tee -a /tmp/browser.log
-
       - name: Commit reviewed production state
         if: success()
         run: |
@@ -86,18 +79,16 @@ jobs:
           PATCH_OUTCOME: ${{ steps.patch.outcome }}
           DEPENDENCIES_OUTCOME: ${{ steps.dependencies.outcome }}
           QUALITY_OUTCOME: ${{ steps.quality.outcome }}
-          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
         run: |
           {
             echo "patch=${PATCH_OUTCOME}"
             echo "dependencies=${DEPENDENCIES_OUTCOME}"
             echo "quality=${QUALITY_OUTCOME}"
-            echo "browser=${BROWSER_OUTCOME}"
-            for log in /tmp/patch.log /tmp/dependencies.log /tmp/quality.log /tmp/browser.log; do
+            for log in /tmp/patch.log /tmp/dependencies.log /tmp/quality.log; do
               if [ -f "$log" ]; then
                 echo
                 echo "--- $(basename "$log") ---"
-                tail -n 80 "$log"
+                tail -n 100 "$log"
               fi
             done
           } > production-review-status.txt

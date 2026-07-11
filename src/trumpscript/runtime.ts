@@ -1,3 +1,5 @@
+import { TrumpFeatureController } from './controller';
+
 export type CommentaryEvent = 'START' | 'HIT' | 'BOUNCE' | 'HOLE' | 'ACE' | 'FINAL';
 export type GradeEvent = 'ACE' | 'UNDER_PAR' | 'PAR' | 'OVER_PAR';
 export type RoundGradeEvent = 'UNDER_PAR' | 'PAR' | 'OVER_PAR';
@@ -220,46 +222,67 @@ export function createTrumpRuntime(source: string): TrumpRuntime {
     throw new Error(`Unsupported TrumpScript compatibility statement: ${line}`);
   }
 
+  const gradeResult = (strokes: number, par: number): string => {
+    const event: GradeEvent =
+      strokes === 1 ? 'ACE' : strokes < par ? 'UNDER_PAR' : strokes === par ? 'PAR' : 'OVER_PAR';
+    return grades.get(event) ?? event.replace('_', ' ');
+  };
+  const roundResult = (strokes: number, par: number): string => {
+    const event: RoundGradeEvent =
+      strokes < par ? 'UNDER_PAR' : strokes === par ? 'PAR' : 'OVER_PAR';
+    return roundTitles.get(event) ?? event.replace('_', ' ');
+  };
+  const levelChallenges = (levelId: number): TrumpFeature[] =>
+    [...features.values()].filter(
+      (feature) =>
+        feature.kind === 'CHALLENGE' && (feature.levelId === null || feature.levelId === levelId),
+    );
+  const evaluateFeatures = (context: TrumpGameplayContext): TrumpFeature[] =>
+    [...features.values()].filter(
+      (feature) =>
+        (feature.levelId === null || feature.levelId === context.levelId) &&
+        feature.conditions.every((condition) => conditionMatches(condition, context)),
+    );
+  const describeFeature = (feature: TrumpFeature): string =>
+    feature.conditions.map(conditionLabel).join(' and ');
+
+  const controller =
+    typeof document === 'undefined'
+      ? null
+      : new TrumpFeatureController({
+          tip: (levelId) => tips.get(levelId) ?? '',
+          theme: (levelId) => themes.get(levelId) ?? null,
+          challenges: levelChallenges,
+          evaluate: evaluateFeatures,
+          getFeature: (id) => features.get(id) ?? null,
+          describe: describeFeature,
+          roundTitle: roundResult,
+        });
+
   return {
     comment(event, seed = Date.now()): string {
+      const override = controller?.recordEvent(event);
+      if (override) return override;
       const choices = comments.get(event) ?? [];
       if (choices.length === 0) return '';
       return choices[Math.abs(seed) % choices.length] ?? choices[0] ?? '';
     },
     grade(strokes, par): string {
-      const event: GradeEvent =
-        strokes === 1 ? 'ACE' : strokes < par ? 'UNDER_PAR' : strokes === par ? 'PAR' : 'OVER_PAR';
-      return grades.get(event) ?? event.replace('_', ' ');
+      controller?.completeLevel(strokes, par);
+      return gradeResult(strokes, par);
     },
-    roundTitle(strokes, par): string {
-      const event: RoundGradeEvent =
-        strokes < par ? 'UNDER_PAR' : strokes === par ? 'PAR' : 'OVER_PAR';
-      return roundTitles.get(event) ?? event.replace('_', ' ');
-    },
+    roundTitle: roundResult,
     tip(levelId): string {
       return tips.get(levelId) ?? '';
     },
     theme(levelId): TrumpTheme | null {
       return themes.get(levelId) ?? null;
     },
-    challenges(levelId): TrumpFeature[] {
-      return [...features.values()].filter(
-        (feature) =>
-          feature.kind === 'CHALLENGE' && (feature.levelId === null || feature.levelId === levelId),
-      );
-    },
-    evaluate(context): TrumpFeature[] {
-      return [...features.values()].filter(
-        (feature) =>
-          (feature.levelId === null || feature.levelId === context.levelId) &&
-          feature.conditions.every((condition) => conditionMatches(condition, context)),
-      );
-    },
+    challenges: levelChallenges,
+    evaluate: evaluateFeatures,
     getFeature(id): TrumpFeature | null {
       return features.get(id) ?? null;
     },
-    describe(feature): string {
-      return feature.conditions.map(conditionLabel).join(' and ');
-    },
+    describe: describeFeature,
   };
 }

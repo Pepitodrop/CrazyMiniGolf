@@ -26,35 +26,84 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Apply reviewed source
+
+      - id: patch
+        name: Apply reviewed patch
         run: |
-          # The staged patch was restored byte-for-byte before this gate runs.
+          set -o pipefail
           cat .reviewed-production/part-* > /tmp/reviewed.patch
-          git apply --check /tmp/reviewed.patch
-          git apply --index /tmp/reviewed.patch
+          git apply --check /tmp/reviewed.patch 2>&1 | tee /tmp/patch.log
+          git apply --index /tmp/reviewed.patch 2>&1 | tee -a /tmp/patch.log
           install -m 0644 .reviewed-production/main.ts src/main.ts
           install -m 0644 .reviewed-production/trumpFeatures.ts src/storage/trumpFeatures.ts
           install -m 0644 .reviewed-production/speechFunction.ts src/trumpscript/speechFunction.ts
           install -m 0644 .reviewed-production/tremendous-function.tr src/trumpscript/tremendous-function.tr
           install -m 0644 .reviewed-production/trump-speech-function.test.ts tests/trump-speech-function.test.ts
-          npm install --package-lock-only --ignore-scripts
-          npm ci
-          npm run generate:engine
-          npm run format
-          npm run lint
-          npm run check:engine
-          npm run validate:levels
-          npm run test:coverage
-          npm run build
-          npx playwright install --with-deps chromium
-          npm run test:e2e
+
+      - id: dependencies
+        name: Install deterministic dependencies
+        run: |
+          set -o pipefail
+          npm install --package-lock-only --ignore-scripts 2>&1 | tee /tmp/dependencies.log
+          npm ci 2>&1 | tee -a /tmp/dependencies.log
+          npm run audit 2>&1 | tee -a /tmp/dependencies.log
+
+      - id: quality
+        name: Run code-quality and test gates
+        run: |
+          set -o pipefail
+          npm run generate:engine 2>&1 | tee /tmp/quality.log
+          npm run format 2>&1 | tee -a /tmp/quality.log
+          npm run lint 2>&1 | tee -a /tmp/quality.log
+          npm run check:engine 2>&1 | tee -a /tmp/quality.log
+          npm run validate:levels 2>&1 | tee -a /tmp/quality.log
+          npm run test:coverage 2>&1 | tee -a /tmp/quality.log
+          npm run build 2>&1 | tee -a /tmp/quality.log
+
+      - id: browser
+        name: Run Chromium production smoke tests
+        run: |
+          set -o pipefail
+          npx playwright install --with-deps chromium 2>&1 | tee /tmp/browser.log
+          npm run test:e2e 2>&1 | tee -a /tmp/browser.log
+
       - name: Commit reviewed production state
+        if: success()
         run: |
           rm -rf .reviewed-production
           rm -f .github/workflows/apply-production-review.yml
           rm -f .github/workflows/apply-reviewed-fix.yml
+          rm -f production-review-status.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "fix: merge reviewed production-ready state"
+          git push
+
+      - name: Publish failure diagnostics
+        if: failure()
+        env:
+          PATCH_OUTCOME: ${{ steps.patch.outcome }}
+          DEPENDENCIES_OUTCOME: ${{ steps.dependencies.outcome }}
+          QUALITY_OUTCOME: ${{ steps.quality.outcome }}
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+        run: |
+          {
+            echo "patch=${PATCH_OUTCOME}"
+            echo "dependencies=${DEPENDENCIES_OUTCOME}"
+            echo "quality=${QUALITY_OUTCOME}"
+            echo "browser=${BROWSER_OUTCOME}"
+            for log in /tmp/patch.log /tmp/dependencies.log /tmp/quality.log /tmp/browser.log; do
+              if [ -f "$log" ]; then
+                echo
+                echo "--- $(basename "$log") ---"
+                tail -n 80 "$log"
+              fi
+            done
+          } > production-review-status.txt
+          git reset --hard HEAD
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add production-review-status.txt
+          git commit -m "ci: record production gate failure"
           git push

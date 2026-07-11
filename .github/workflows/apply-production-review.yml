@@ -39,6 +39,7 @@ jobs:
           install -m 0644 .reviewed-production/speechFunction.ts src/trumpscript/speechFunction.ts
           install -m 0644 .reviewed-production/tremendous-function.tr src/trumpscript/tremendous-function.tr
           install -m 0644 .reviewed-production/trump-speech-function.test.ts tests/trump-speech-function.test.ts
+          rm -rf .reviewed-production
 
       - id: dependencies
         name: Install deterministic dependencies
@@ -70,7 +71,6 @@ jobs:
       - name: Commit reviewed production state
         if: success()
         run: |
-          rm -rf .reviewed-production
           rm -f .github/workflows/apply-production-review.yml
           rm -f .github/workflows/apply-reviewed-fix.yml
           rm -f production-review-status.txt

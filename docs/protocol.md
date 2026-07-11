@@ -22,7 +22,7 @@ An invocation may contain one or more orthogonal flags, although the game normal
 |  1–2 | ball X/Y                       |
 |  3–6 | X/Y speed magnitudes and signs |
 |    7 | strength                       |
-|    8 | stroke count                   |
+|    8 | stroke count, saturated at 255 |
 |    9 | collision status               |
 |   10 | moving value                   |
 |   11 | hole status                    |
@@ -30,4 +30,4 @@ An invocation may contain one or more orthogonal flags, although the game normal
 |   13 | error code                     |
 |   14 | reserved                       |
 
-The decoder rejects packets with any other length. The worker limits execution to 350,000 commands, 96 tape cells and 32 output bytes.
+The decoder rejects packets with any other length. `maxLevel` is enforced by Brainfuck during advancement, and the one-byte stroke field saturates rather than wrapping. The worker limits execution to 350,000 commands, 96 tape cells and 32 output bytes.

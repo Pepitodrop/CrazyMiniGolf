@@ -1,0 +1,328 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+class BrainfuckBuilder {
+  private pointer = 0;
+  private readonly chunks: string[] = [];
+
+  get code(): string {
+    return this.chunks.join('');
+  }
+
+  at(cell: number): void {
+    const distance = cell - this.pointer;
+    this.chunks.push(distance >= 0 ? '>'.repeat(distance) : '<'.repeat(-distance));
+    this.pointer = cell;
+  }
+
+  raw(code: string): void {
+    this.chunks.push(code);
+  }
+
+  clear(cell: number): void {
+    this.at(cell);
+    this.raw('[-]');
+  }
+
+  add(cell: number, amount: number): void {
+    this.at(cell);
+    this.raw(amount >= 0 ? '+'.repeat(amount) : '-'.repeat(-amount));
+  }
+
+  set(cell: number, value: number): void {
+    this.clear(cell);
+    this.add(cell, value);
+  }
+
+  copyPreserve(source: number, destination: number, temporary: number): void {
+    this.clear(destination);
+    this.clear(temporary);
+    this.at(source);
+    this.raw('[');
+    this.raw('-');
+    this.add(destination, 1);
+    this.add(temporary, 1);
+    this.at(source);
+    this.raw(']');
+    this.at(temporary);
+    this.raw('[');
+    this.raw('-');
+    this.add(source, 1);
+    this.at(temporary);
+    this.raw(']');
+  }
+
+  addPreserve(source: number, destination: number, temporary: number): void {
+    this.clear(temporary);
+    this.at(source);
+    this.raw('[');
+    this.raw('-');
+    this.add(destination, 1);
+    this.add(temporary, 1);
+    this.at(source);
+    this.raw(']');
+    this.at(temporary);
+    this.raw('[');
+    this.raw('-');
+    this.add(source, 1);
+    this.at(temporary);
+    this.raw(']');
+  }
+
+  subtractPreserve(source: number, destination: number, temporary: number): void {
+    this.clear(temporary);
+    this.at(source);
+    this.raw('[');
+    this.raw('-');
+    this.add(destination, -1);
+    this.add(temporary, 1);
+    this.at(source);
+    this.raw(']');
+    this.at(temporary);
+    this.raw('[');
+    this.raw('-');
+    this.add(source, 1);
+    this.at(temporary);
+    this.raw(']');
+  }
+
+  move(source: number, destination: number): void {
+    this.clear(destination);
+    this.at(source);
+    this.raw('[');
+    this.raw('-');
+    this.add(destination, 1);
+    this.at(source);
+    this.raw(']');
+  }
+
+  ifConsume(cell: number, body: () => void): void {
+    this.at(cell);
+    this.raw('[');
+    body();
+    this.clear(cell);
+    this.at(cell);
+    this.raw(']');
+  }
+
+  ifZeroPreserve(
+    cell: number,
+    copy: number,
+    flag: number,
+    restore: number,
+    body: () => void,
+  ): void {
+    this.set(flag, 1);
+    this.copyPreserve(cell, copy, restore);
+    this.ifConsume(copy, () => this.clear(flag));
+    this.ifConsume(flag, body);
+  }
+
+  output(cell: number): void {
+    this.at(cell);
+    this.raw('.');
+  }
+}
+
+const CELL = {
+  level: 0,
+  x: 1,
+  y: 2,
+  velocityX: 3,
+  xNegative: 4,
+  velocityY: 5,
+  yNegative: 6,
+  aimXActive: 7,
+  aimXNegative: 8,
+  aimYActive: 9,
+  aimYNegative: 10,
+  strength: 11,
+  strokes: 12,
+  strike: 13,
+  tick: 14,
+  blockX: 15,
+  blockY: 16,
+  decayX: 17,
+  decayY: 18,
+  holeSensor: 19,
+  advance: 20,
+  reset: 21,
+  resetX: 22,
+  resetY: 23,
+  maxLevel: 24,
+  paused: 25,
+  collision: 26,
+  moving: 27,
+  inHole: 28,
+  complete: 29,
+  error: 30,
+  reserved: 31,
+  t0: 32,
+  t1: 33,
+  t2: 34,
+  t3: 35,
+  t4: 36,
+} as const;
+
+const builder = new BrainfuckBuilder();
+
+// Read exactly 32 protocol bytes.
+for (let cell = 0; cell < 32; cell += 1) {
+  builder.at(cell);
+  builder.raw(',');
+}
+
+builder.clear(CELL.collision);
+builder.clear(CELL.error);
+
+const toggleSign = (sign: number): void => {
+  builder.set(CELL.t0, 1);
+  builder.copyPreserve(sign, CELL.t1, CELL.t2);
+  builder.ifConsume(CELL.t1, () => {
+    builder.clear(sign);
+    builder.clear(CELL.t0);
+  });
+  builder.ifConsume(CELL.t0, () => builder.set(sign, 1));
+};
+
+const moveSigned = (position: number, velocity: number, negative: number): void => {
+  builder.set(CELL.t0, 1);
+  builder.copyPreserve(negative, CELL.t1, CELL.t2);
+  builder.ifConsume(CELL.t1, () => {
+    builder.subtractPreserve(velocity, position, CELL.t3);
+    builder.clear(CELL.t0);
+  });
+  builder.ifConsume(CELL.t0, () => builder.addPreserve(velocity, position, CELL.t3));
+};
+
+const processAxis = (
+  position: number,
+  velocity: number,
+  negative: number,
+  blocked: number,
+  decay: number,
+): void => {
+  builder.copyPreserve(velocity, CELL.t4, CELL.t3);
+  builder.ifConsume(CELL.t4, () => {
+    builder.set(CELL.t0, 1);
+    builder.ifConsume(blocked, () => {
+      toggleSign(negative);
+      builder.set(CELL.collision, 1);
+      builder.clear(CELL.t0);
+    });
+    builder.ifConsume(CELL.t0, () => moveSigned(position, velocity, negative));
+    builder.ifConsume(decay, () => builder.add(velocity, -1));
+  });
+};
+
+// Apply a strike. Strokes saturate at 255 instead of wrapping to zero.
+builder.ifConsume(CELL.strike, () => {
+  builder.add(CELL.strokes, 1);
+  builder.ifZeroPreserve(CELL.strokes, CELL.t0, CELL.t1, CELL.t2, () =>
+    builder.add(CELL.strokes, -1),
+  );
+  builder.ifConsume(CELL.aimXActive, () => {
+    builder.copyPreserve(CELL.strength, CELL.velocityX, CELL.t2);
+    builder.copyPreserve(CELL.aimXNegative, CELL.xNegative, CELL.t2);
+  });
+  builder.ifConsume(CELL.aimYActive, () => {
+    builder.copyPreserve(CELL.strength, CELL.velocityY, CELL.t2);
+    builder.copyPreserve(CELL.aimYNegative, CELL.yNegative, CELL.t2);
+  });
+});
+
+// Execute one deterministic integer physics tick.
+builder.ifConsume(CELL.tick, () => {
+  processAxis(CELL.x, CELL.velocityX, CELL.xNegative, CELL.blockX, CELL.decayX);
+  processAxis(CELL.y, CELL.velocityY, CELL.yNegative, CELL.blockY, CELL.decayY);
+});
+
+// Capture the ball and stop all motion.
+builder.ifConsume(CELL.holeSensor, () => {
+  builder.set(CELL.inHole, 1);
+  builder.set(CELL.complete, 1);
+  builder.clear(CELL.velocityX);
+  builder.clear(CELL.velocityY);
+  builder.clear(CELL.xNegative);
+  builder.clear(CELL.yNegative);
+});
+
+// Advance only when current level is below maxLevel.
+builder.ifConsume(CELL.advance, () => {
+  builder.copyPreserve(CELL.maxLevel, CELL.t0, CELL.t2);
+  builder.copyPreserve(CELL.level, CELL.t1, CELL.t2);
+  builder.at(CELL.t1);
+  builder.raw('[');
+  builder.raw('-');
+  builder.add(CELL.t0, -1);
+  builder.at(CELL.t1);
+  builder.raw(']');
+  builder.ifConsume(CELL.t0, () => builder.add(CELL.level, 1));
+});
+
+// Reset per-level state after an optional level advance.
+builder.ifConsume(CELL.reset, () => {
+  builder.move(CELL.resetX, CELL.x);
+  builder.move(CELL.resetY, CELL.y);
+  for (const cell of [
+    CELL.velocityX,
+    CELL.xNegative,
+    CELL.velocityY,
+    CELL.yNegative,
+    CELL.strokes,
+    CELL.collision,
+    CELL.moving,
+    CELL.inHole,
+    CELL.complete,
+  ]) {
+    builder.clear(cell);
+  }
+});
+
+// Recompute the stationary/moving value from velocity magnitudes.
+builder.clear(CELL.moving);
+builder.addPreserve(CELL.velocityX, CELL.moving, CELL.t2);
+builder.addPreserve(CELL.velocityY, CELL.moving, CELL.t2);
+
+for (const cell of [
+  CELL.level,
+  CELL.x,
+  CELL.y,
+  CELL.velocityX,
+  CELL.xNegative,
+  CELL.velocityY,
+  CELL.yNegative,
+  CELL.strength,
+  CELL.strokes,
+  CELL.collision,
+  CELL.moving,
+  CELL.inHole,
+  CELL.complete,
+  CELL.error,
+  CELL.reserved,
+]) {
+  builder.output(cell);
+}
+
+const header = [
+  'BRAINFUCK MINI GOLF GENERATED STATE TRANSITION KERNEL',
+  'INPUT THIRTY TWO BYTES OUTPUT FIFTEEN BYTES',
+  'GENERATE WITH NPM RUN GENERATE ENGINE',
+  '',
+].join('\n');
+
+const destination = resolve('src/brainfuck/engine.bf');
+const generated = `${header}${builder.code}
+`;
+if (process.argv.includes('--check')) {
+  const current = existsSync(destination) ? readFileSync(destination, 'utf8') : '';
+  if (current !== generated) {
+    console.error('src/brainfuck/engine.bf is out of date. Run npm run generate:engine.');
+    process.exitCode = 1;
+  } else {
+    console.log(`Verified ${destination} with ${builder.code.length} Brainfuck commands.`);
+  }
+} else {
+  writeFileSync(destination, generated, 'utf8');
+  console.log(`Generated ${destination} with ${builder.code.length} Brainfuck commands.`);
+}

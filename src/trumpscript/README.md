@@ -39,6 +39,16 @@ The compatibility runtime now controls:
 - hidden Easter eggs
 - level and round result titles
 
-The browser-side compatibility controller observes only the existing `START`, `HIT`, `BOUNCE`, `HOLE`, `ACE` and `FINAL` events plus the already rendered level/power values. It builds a read-only summary containing strokes, par, bounces, shot count and power usage, then evaluates the declarative rules.
+The browser-side compatibility controller receives explicit typed callbacks for level starts, shots and bounces. It builds a read-only summary containing strokes, par, bounces, shot count, maximum/final power and diagonal-shot count, then evaluates the declarative rules. It does not scrape the DOM for gameplay data.
 
 The controller may add its own optional DOM panels and use the namespaced `crazy-mini-golf-trump-features-v1` Local Storage key for style points and medals. It has no network access and cannot write to the Brainfuck tape, alter strokes, unlock levels or modify authoritative highscores. A parser or controller failure leaves the core game usable.
+
+## Speech function
+
+A separate optional function file supports one deliberately theatrical declaration:
+
+```text
+MAKE FUNCTION tremendous-deal GREAT AGAIN WITH STROKES AND PAR SAY "The result is {RESULT} and the number is {TREMENDOUS_NUMBER}."
+```
+
+The allowlisted placeholders are `STROKES`, `PAR`, `MARGIN`, `RESULT` and `TREMENDOUS_NUMBER`. The function returns display text only and has no write access to game state.

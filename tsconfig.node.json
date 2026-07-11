@@ -17,6 +17,9 @@
     "scripts/**/*.ts",
     "src/levels/schema.ts",
     "src/levels/levels.json",
-    "src/game/types.ts"
+    "src/game/types.ts",
+    "src/game/collision.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
   ]
 }

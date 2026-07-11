@@ -24,10 +24,19 @@ export const emptyTrumpFeatureProgress = (): TrumpFeatureProgress => ({
   unlockedFeatureIds: [],
 });
 
+function browserStorage(): TrumpFeatureStorageLike | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function loadTrumpFeatureProgress(
-  storage: TrumpFeatureStorageLike = localStorage,
+  storage: TrumpFeatureStorageLike | null = browserStorage(),
 ): TrumpFeatureProgress {
   try {
+    if (!storage) return emptyTrumpFeatureProgress();
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return emptyTrumpFeatureProgress();
     const parsed = JSON.parse(raw) as Partial<TrumpFeatureProgress>;
@@ -51,9 +60,15 @@ export function loadTrumpFeatureProgress(
 
 export function saveTrumpFeatureProgress(
   progress: TrumpFeatureProgress,
-  storage: TrumpFeatureStorageLike = localStorage,
-): void {
-  storage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  storage: TrumpFeatureStorageLike | null = browserStorage(),
+): boolean {
+  try {
+    if (!storage) return false;
+    storage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function recordTrumpAwards(
@@ -72,4 +87,12 @@ export function recordTrumpAwards(
       unlockedFeatureIds: [...unlocked].sort(),
     },
   };
+}
+
+export function resetTrumpFeatureProgress(
+  storage: TrumpFeatureStorageLike | null = browserStorage(),
+): TrumpFeatureProgress {
+  const progress = emptyTrumpFeatureProgress();
+  saveTrumpFeatureProgress(progress, storage);
+  return progress;
 }

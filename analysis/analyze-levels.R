@@ -22,16 +22,24 @@ write.csv(results, csv_path, row.names = FALSE)
 jsonlite::write_json(results, json_path, pretty = TRUE, na = "null")
 
 png(png_path, width = 1100, height = 650)
-barplot(
+bar_positions <- barplot(
   ifelse(is.na(results$expected_strokes), 0, results$expected_strokes),
   names.arg = results$id,
   main = "Estimated Crazy Mini Golf difficulty",
   xlab = "Level",
   ylab = "Expected strokes among solved simulations"
 )
-abline(h = results$configured_par, lty = 3)
+points(bar_positions, results$configured_par, pch = 19)
+legend(
+  "topleft",
+  legend = c("Expected strokes", "Configured par"),
+  pch = c(15, 19),
+  bty = "n"
+)
 dev.off()
 
 print(results)
 cat(sprintf("\nWrote %s, %s and %s\n", csv_path, json_path, png_path))
-if (any(!results$principally_solvable)) warning("The coarse solver did not solve every level; inspect the generated report.")
+if (any(!results$coarse_solver_found_path)) {
+  warning("The coarse stochastic solver did not find a path for every level; this is not a proof of unsolvability.")
+}

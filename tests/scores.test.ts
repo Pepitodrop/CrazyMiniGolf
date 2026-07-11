@@ -33,6 +33,16 @@ describe('local score storage', () => {
     expect(loadProgress(storage)).toEqual(progress);
   });
 
+  it('returns false instead of throwing when storage writes are blocked', () => {
+    const storage: StorageLike = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    expect(saveProgress(emptyProgress(), storage)).toBe(false);
+  });
+
   it('computes a total highscore after all nine levels', () => {
     let progress = emptyProgress();
     for (let id = 1; id <= 9; id += 1) progress = recordLevelScore(progress, id, id + 1, id);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import rawLevels from '../src/levels/levels.json';
+import { LevelManager } from '../src/game/LevelManager';
 import { parseLevels, validateLevel } from '../src/levels/schema';
 
 describe('level data', () => {
@@ -11,7 +12,30 @@ describe('level data', () => {
     expect(levels.at(-1)?.par).toBeGreaterThan(levels[0]?.par ?? 0);
   });
 
-  it('rejects malformed levels', () => {
-    expect(() => parseLevels([{ id: 1 }])).toThrow(/Expected 9 levels/);
+  it('rejects malformed and out-of-bounds level geometry', () => {
+    const invalid = {
+      ...rawLevels[0],
+      id: 20,
+      par: -5,
+      obstacles: [{ type: 'rect', x: -999, y: 10, width: 20, height: 20 }],
+    };
+    const errors = validateLevel(invalid);
+    expect(errors).toContain('id must be between 1 and 9.');
+    expect(errors).toContain('par must be between 1 and 20.');
+    expect(errors.some((error) => error.includes('lies outside'))).toBe(true);
+  });
+
+  it('requires ids to be exactly one through nine', () => {
+    const shifted = rawLevels.map((level, index) => ({ ...level, id: index + 20 }));
+    expect(() => parseLevels(shifted)).toThrow(/exactly 1 through 9/);
+  });
+
+  it('provides deterministic level lookup with useful errors', () => {
+    const manager = new LevelManager();
+    expect(manager.count).toBe(9);
+    expect(manager.getByIndex(0).id).toBe(1);
+    expect(manager.getById(9).name).toBe('Segfault Summit');
+    expect(() => manager.getByIndex(99)).toThrow(/Unknown level index/);
+    expect(() => manager.getById(99)).toThrow(/Unknown level id/);
   });
 });

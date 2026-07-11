@@ -38,6 +38,16 @@ describe('TrumpScript feature persistence', () => {
     expect(second.newlyUnlocked).toHaveLength(0);
   });
 
+  it('returns false instead of throwing when medal storage is unavailable', () => {
+    const storage: TrumpFeatureStorageLike = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    expect(saveTrumpFeatureProgress(emptyTrumpFeatureProgress(), storage)).toBe(false);
+  });
+
   it('persists style points and unique medals', () => {
     const storage = new MemoryStorage();
     const result = recordTrumpAwards(emptyTrumpFeatureProgress(), [award('a', 40), award('b', 60)]);

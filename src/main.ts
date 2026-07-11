@@ -73,7 +73,7 @@ app.innerHTML = `
     </section>
 
     <footer>
-      <span>TypeScript host · Brainfuck state engine · R balancing · isolated TrumpScript commentary</span>
+      <span>TypeScript host · Brainfuck state engine · R balancing · isolated TrumpScript features</span>
       <a href="https://github.com/Pepitodrop/CrazyMiniGolf" target="_blank" rel="noreferrer">SOURCE</a>
     </footer>
   </main>
@@ -110,22 +110,24 @@ const resetProgressButton = element<HTMLButtonElement>('#reset-progress');
 const levels = new LevelManager();
 let progress = loadProgress();
 const sessionScores = new Map<number, { strokes: number; par: number }>();
+const levelButtons = new Map<number, HTMLButtonElement>();
 let currentState: EngineState | null = null;
-let pendingTrumpSpeech: string | null = null;
+let pendingCompletionMessage: string | null = null;
+let pendingFinalMessage: string | null = null;
 
 let trumpRuntime: ReturnType<typeof createTrumpRuntime> | null = null;
 try {
   trumpRuntime = createTrumpRuntime(commentatorSource);
 } catch (error) {
-  commentator.textContent = `Commentary disabled: ${error instanceof Error ? error.message : 'parser error'}`;
+  commentator.textContent = `Optional TrumpScript features disabled: ${error instanceof Error ? error.message : 'parser error'}`;
 }
 
-let trumpSpeech: ReturnType<typeof createTrumpSpeechFunction> | null = null;
+let trumpSpeechFunction: ReturnType<typeof createTrumpSpeechFunction> | null = null;
 try {
-  trumpSpeech = createTrumpSpeechFunction(tremendousFunctionSource);
+  trumpSpeechFunction = createTrumpSpeechFunction(tremendousFunctionSource);
 } catch (error) {
   console.warn(
-    `TrumpScript speech function disabled: ${error instanceof Error ? error.message : 'parser error'}`,
+    `Optional TrumpScript speech function disabled: ${error instanceof Error ? error.message : 'parser error'}`,
   );
 }
 
@@ -142,31 +144,50 @@ function totalRelativeToPar(state: EngineState, level: LevelDefinition): string 
   return difference === 0 ? 'E' : difference > 0 ? `+${difference}` : String(difference);
 }
 
-function renderProgress(): void {
-  levelSelect.innerHTML = '';
+function showWarning(message: string): void {
+  commentator.classList.remove('error');
+  commentator.classList.add('warning');
+  commentator.textContent = `WARNING: ${message}`;
+}
+
+function showComment(event: CommentaryEvent): void {
+  commentator.classList.remove('error', 'warning');
+  if ((event === 'HOLE' || event === 'ACE') && pendingCompletionMessage) {
+    commentator.textContent = pendingCompletionMessage;
+    pendingCompletionMessage = null;
+    return;
+  }
+  if (event === 'FINAL' && pendingFinalMessage) {
+    commentator.textContent = pendingFinalMessage;
+    pendingFinalMessage = null;
+    return;
+  }
+  const message = trumpRuntime?.comment(event, Date.now() + (currentState?.strokes ?? 0));
+  if (message) commentator.textContent = message;
+}
+
+function createLevelButtons(): void {
   for (const level of levels.levels) {
     const button = document.createElement('button');
-    const score = progress.scores.find((entry) => entry.levelId === level.id);
     button.type = 'button';
+    button.addEventListener('click', () => void game.selectLevel(level.id));
+    levelButtons.set(level.id, button);
+    levelSelect.append(button);
+  }
+}
+
+function updateProgressView(): void {
+  for (const level of levels.levels) {
+    const button = levelButtons.get(level.id);
+    if (!button) continue;
+    const score = progress.scores.find((entry) => entry.levelId === level.id);
     button.textContent = score ? `${level.id} · ${score.bestStrokes}` : String(level.id);
     button.title = score ? `${level.name}: best ${score.bestStrokes}` : level.name;
     button.disabled = level.id > progress.unlockedLevel;
     button.classList.toggle('active', currentState?.level === level.id);
-    button.addEventListener('click', () => void game.selectLevel(level.id));
-    levelSelect.append(button);
   }
   highscoreValue.textContent =
     progress.totalBest === null ? 'Not completed' : `${progress.totalBest} strokes`;
-}
-
-function showComment(event: CommentaryEvent): void {
-  const message = trumpRuntime?.comment(event, Date.now() + (currentState?.strokes ?? 0));
-  if ((event === 'HOLE' || event === 'ACE') && pendingTrumpSpeech) {
-    commentator.textContent = [pendingTrumpSpeech, message].filter(Boolean).join(' — ');
-    pendingTrumpSpeech = null;
-    return;
-  }
-  if (message) commentator.textContent = message;
 }
 
 const game = new Game(canvas, levels, 1, {
@@ -182,26 +203,49 @@ const game = new Game(canvas, levels, 1, {
     pauseButton.textContent = paused ? 'RESUME' : 'PAUSE';
     nextButton.hidden = !state.levelComplete || state.level >= levels.count;
     hitButton.disabled = paused || state.levelComplete || state.velocityX + state.velocityY > 0;
-    renderProgress();
+    updateProgressView();
   },
   onMessage(event) {
     showComment(event as CommentaryEvent);
   },
   onError(message) {
-    commentator.textContent = message;
+    commentator.classList.remove('warning');
     commentator.classList.add('error');
+    commentator.textContent = message;
+  },
+  onWarning: showWarning,
+  onLevelStart(level) {
+    trumpRuntime?.startLevel(level.id);
+  },
+  onShot(shot) {
+    trumpRuntime?.recordShot({ strength: shot.strength, diagonal: shot.diagonal });
+  },
+  onBounce() {
+    trumpRuntime?.recordBounce();
+  },
+  onRoundReset() {
+    sessionScores.clear();
+    pendingFinalMessage = null;
   },
   onLevelComplete(level, strokes) {
     sessionScores.set(level.id, { strokes, par: level.par });
     progress = recordLevelScore(progress, level.id, strokes, level.par);
-    saveProgress(progress);
-    const grade = trumpRuntime?.grade(strokes, level.par) ?? '';
-    const speech = trumpSpeech?.invoke({ strokes, par: level.par }) ?? '';
-    pendingTrumpSpeech = [grade, speech].filter(Boolean).join(' — ');
-    renderProgress();
+    if (!saveProgress(progress)) showWarning('Progress could not be stored in this browser.');
+
+    const completion = trumpRuntime?.completeLevel(level.id, strokes, level.par);
+    if (completion && !completion.saved) {
+      showWarning('TrumpScript medals could not be stored in this browser.');
+    }
+    const awardText = completion?.awards.map((award) => award.message).join(' ') ?? '';
+    const grade = completion?.grade ?? trumpRuntime?.grade(strokes, level.par) ?? '';
+    const speech = trumpSpeechFunction?.invoke({ strokes, par: level.par }) ?? '';
+    pendingCompletionMessage = [grade, speech, awardText].filter(Boolean).join(' — ');
+    updateProgressView();
   },
   onFinalComplete(strokes) {
-    commentator.dataset.final = `Round total: ${strokes}`;
+    const totalPar = levels.levels.reduce((sum, level) => sum + level.par, 0);
+    const title = trumpRuntime?.roundTitle(strokes, totalPar) ?? 'ROUND COMPLETE';
+    pendingFinalMessage = `${title} — ${strokes} strokes.`;
   },
 });
 
@@ -224,14 +268,15 @@ audioToggle.addEventListener('change', () => game.setAudioEnabled(audioToggle.ch
 resetProgressButton.addEventListener('click', () => {
   progress = resetProgress();
   sessionScores.clear();
-  pendingTrumpSpeech = null;
-  renderProgress();
+  updateProgressView();
+  commentator.classList.remove('error', 'warning');
   commentator.textContent = 'Save data reset. Level one is unlocked.';
   void game.selectLevel(1);
 });
 
 window.addEventListener('beforeunload', () => game.dispose());
-renderProgress();
+createLevelButtons();
+updateProgressView();
 updateMobileAim();
 showComment('START');
 game.start();

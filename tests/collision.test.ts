@@ -37,6 +37,17 @@ describe('collision adapter', () => {
     expect(sensors.collisionKind).toBe('obstacle');
   });
 
+  it('blocks both axes when a diagonal step would clip an obstacle corner', () => {
+    const cornerLevel: LevelDefinition = {
+      ...level,
+      obstacles: [{ type: 'rect', x: 50, y: 50, width: 20, height: 20 }],
+    };
+    const sensors = calculateCollisionSensors(cornerLevel, { x: 44, y: 44 }, 4, false, 4, false);
+    expect(sensors.blockX).toBe(true);
+    expect(sensors.blockY).toBe(true);
+    expect(sensors.collisionKind).toBe('obstacle');
+  });
+
   it('requires a slow ball inside the capture radius', () => {
     expect(isBallInHole(level, { x: 105, y: 40 }, 2)).toBe(true);
     expect(isBallInHole(level, { x: 105, y: 40 }, 3)).toBe(false);

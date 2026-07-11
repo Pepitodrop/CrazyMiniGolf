@@ -8,3 +8,5 @@ analysis/results/*.png
 .DS_Store
 
 *.tsbuildinfo
+test-results/
+playwright-report/

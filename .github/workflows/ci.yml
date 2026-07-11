@@ -16,12 +16,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+          cache: npm
+      - run: npm ci
+      - run: npm run audit
       - run: npm run format:check
       - run: npm run lint
+      - run: npm run check:engine
       - run: npm run validate:levels
       - run: npm run test:coverage
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
   r-analysis:
     runs-on: ubuntu-latest

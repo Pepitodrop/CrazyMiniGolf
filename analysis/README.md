@@ -26,3 +26,5 @@ The deterministic seed is `20260711`. Outputs:
 - `level-difficulty.png`
 
 The solver ranks all 104 direction/power combinations from each resting position, adds controlled exploration, and estimates solvability, expected strokes, and a suggested par over repeated rounds. This is a coarse balancing tool, not a mathematical proof of reachability.
+
+`coarse_solver_found_path` means only that the seeded coarse stochastic search found a route in its trials; it is not a formal solvability proof.

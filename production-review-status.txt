@@ -1,0 +1,111 @@
+patch=success
+dependencies=success
+quality=failure
+browser=skipped
+
+--- patch.log ---
+
+--- dependencies.log ---
+
+up to date, audited 306 packages in 21s
+
+75 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 254 packages, and audited 255 packages in 4s
+
+75 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> crazy-mini-golf@1.0.0 audit
+> npm audit --audit-level=high
+
+found 0 vulnerabilities
+
+--- quality.log ---
+[90m.reviewed-production/main.ts[39m 206ms (unchanged)
+[90m.reviewed-production/speechFunction.ts[39m 30ms (unchanged)
+[90m.reviewed-production/trump-speech-function.test.ts[39m 19ms (unchanged)
+[90m.reviewed-production/trumpFeatures.ts[39m 24ms (unchanged)
+[90manalysis/README.md[39m 57ms (unchanged)
+[90mdocs/architecture.md[39m 24ms (unchanged)
+[90mdocs/development.md[39m 14ms (unchanged)
+[90mdocs/protocol.md[39m 31ms (unchanged)
+[90meslint.config.js[39m 15ms (unchanged)
+[90mindex.html[39m 32ms (unchanged)
+[90mpackage-lock.json[39m 135ms (unchanged)
+[90mpackage.json[39m 3ms (unchanged)
+[90mplaywright.config.ts[39m 14ms (unchanged)
+[90mREADME.md[39m 109ms (unchanged)
+[90mscripts/generate-brainfuck-engine.ts[39m 73ms (unchanged)
+[90mscripts/validate-levels.ts[39m 7ms (unchanged)
+[90msrc/brainfuck/EngineClient.ts[39m 37ms (unchanged)
+[90msrc/brainfuck/interpreter.ts[39m 30ms (unchanged)
+src/brainfuck/memory-map.md 33ms
+[90msrc/brainfuck/protocol.ts[39m 26ms (unchanged)
+[90msrc/brainfuck/worker.ts[39m 9ms (unchanged)
+[90msrc/game/AudioManager.ts[39m 10ms (unchanged)
+[90msrc/game/collision.ts[39m 17ms (unchanged)
+[90msrc/game/Game.ts[39m 95ms (unchanged)
+[90msrc/game/InputManager.ts[39m 19ms (unchanged)
+[90msrc/game/LevelManager.ts[39m 3ms (unchanged)
+[90msrc/game/Renderer.ts[39m 34ms (unchanged)
+[90msrc/game/types.ts[39m 6ms (unchanged)
+[90msrc/levels/levels.json[39m 9ms (unchanged)
+[90msrc/levels/schema.ts[39m 22ms (unchanged)
+[90msrc/main.ts[39m 31ms (unchanged)
+[90msrc/storage/scores.ts[39m 14ms (unchanged)
+[90msrc/storage/trumpFeatures.ts[39m 13ms (unchanged)
+[90msrc/trumpscript/controller.ts[39m 39ms (unchanged)
+[90msrc/trumpscript/README.md[39m 8ms (unchanged)
+[90msrc/trumpscript/runtime.ts[39m 37ms (unchanged)
+[90msrc/trumpscript/speechFunction.ts[39m 10ms (unchanged)
+[90msrc/ui/styles.css[39m 77ms (unchanged)
+[90msrc/vite-env.d.ts[39m 4ms (unchanged)
+[90mtests/audio-manager.test.ts[39m 12ms (unchanged)
+[90mtests/brainfuck-engine.test.ts[39m 36ms (unchanged)
+[90mtests/brainfuck-interpreter.test.ts[39m 18ms (unchanged)
+[90mtests/collision.test.ts[39m 16ms (unchanged)
+[90mtests/e2e/smoke.spec.ts[39m 10ms (unchanged)
+[90mtests/engine-client.test.ts[39m 25ms (unchanged)
+[90mtests/game.test.ts[39m 32ms (unchanged)
+[90mtests/input-manager.test.ts[39m 9ms (unchanged)
+[90mtests/levels.test.ts[39m 6ms (unchanged)
+[90mtests/protocol.test.ts[39m 6ms (unchanged)
+[90mtests/renderer.test.ts[39m 8ms (unchanged)
+[90mtests/scores.test.ts[39m 7ms (unchanged)
+[90mtests/trump-controller.test.ts[39m 9ms (unchanged)
+[90mtests/trump-features-storage.test.ts[39m 5ms (unchanged)
+[90mtests/trump-speech-function.test.ts[39m 4ms (unchanged)
+[90mtests/trumpscript.test.ts[39m 11ms (unchanged)
+[90mtests/worker.test.ts[39m 2ms (unchanged)
+[90mtsconfig.app.json[39m 2ms (unchanged)
+[90mtsconfig.json[39m 1ms (unchanged)
+[90mtsconfig.node.json[39m 1ms (unchanged)
+[90mvite.config.ts[39m 2ms (unchanged)
+[90mvitest.config.ts[39m 2ms (unchanged)
+
+> crazy-mini-golf@1.0.0 lint
+> eslint .
+
+
+/home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/main.ts
+  0:0  error  Parsing error: /home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/main.ts was not found by the project service. Consider either including it in the tsconfig.json or including it in allowDefaultProject
+
+/home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/speechFunction.ts
+  0:0  error  Parsing error: /home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/speechFunction.ts was not found by the project service. Consider either including it in the tsconfig.json or including it in allowDefaultProject
+
+/home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/trump-speech-function.test.ts
+  0:0  error  Parsing error: /home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/trump-speech-function.test.ts was not found by the project service. Consider either including it in the tsconfig.json or including it in allowDefaultProject
+
+/home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/trumpFeatures.ts
+  0:0  error  Parsing error: /home/runner/work/CrazyMiniGolf/CrazyMiniGolf/.reviewed-production/trumpFeatures.ts was not found by the project service. Consider either including it in the tsconfig.json or including it in allowDefaultProject
+
+✖ 4 problems (4 errors, 0 warnings)
+

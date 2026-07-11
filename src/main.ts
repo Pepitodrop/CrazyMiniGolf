@@ -1,4 +1,5 @@
 import './ui/styles.css';
+import './ui/release.css';
 import commentatorSource from './trumpscript/commentator.tr?raw';
 import tremendousFunctionSource from './trumpscript/tremendous-function.tr?raw';
 import { Game } from './game/Game';
@@ -6,7 +7,13 @@ import { LevelManager } from './game/LevelManager';
 import type { CommentaryEvent } from './trumpscript/runtime';
 import { createTrumpRuntime } from './trumpscript/runtime';
 import { createTrumpSpeechFunction } from './trumpscript/speechFunction';
-import { loadProgress, recordLevelScore, resetProgress, saveProgress } from './storage/scores';
+import {
+  loadProgress,
+  recordLevelScore,
+  recordRoundScore,
+  resetProgress,
+  saveProgress,
+} from './storage/scores';
 import type { EngineState, LevelDefinition } from './game/types';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -16,7 +23,7 @@ app.innerHTML = `
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">BRAINFUCK POWERED</p>
+        <p class="eyebrow">BRAINFUCK POWERED · v1.0.0</p>
         <h1>CRAZY MINI GOLF</h1>
       </div>
       <div class="top-actions">
@@ -40,6 +47,7 @@ app.innerHTML = `
         <div class="commentator" id="commentator">Loading the tremendous commentary engine…</div>
         <div class="completion-actions">
           <button id="next-button" type="button" hidden>NEXT LEVEL</button>
+          <button id="recover-button" class="danger" type="button" hidden>RELOAD ENGINE</button>
         </div>
       </div>
 
@@ -65,16 +73,21 @@ app.innerHTML = `
           <p class="snap-note">Retro physics snaps shots to eight directions.</p>
         </section>
         <section class="highscore">
-          <h3>LOCAL HIGHSCORE</h3>
+          <h3>BEST COMPLETED ROUND</h3>
           <p id="highscore-value">Not completed</p>
+          <p class="secondary-score">Combined hole bests: <span id="hole-bests-value">Not completed</span></p>
           <button id="reset-progress" class="danger" type="button">RESET SAVE</button>
         </section>
       </aside>
     </section>
 
     <footer>
-      <span>TypeScript host · Brainfuck state engine · R balancing · isolated TrumpScript features</span>
-      <a href="https://github.com/Pepitodrop/CrazyMiniGolf" target="_blank" rel="noreferrer">SOURCE</a>
+      <span>TypeScript · Brainfuck · R · isolated TrumpScript-compatible parody features</span>
+      <nav aria-label="Project links">
+        <a href="./privacy.html">PRIVACY</a>
+        <a href="./legal.html">LEGAL & PARODY NOTICE</a>
+        <a href="https://github.com/Pepitodrop/CrazyMiniGolf" target="_blank" rel="noreferrer">SOURCE</a>
+      </nav>
     </footer>
   </main>
 `;
@@ -95,6 +108,7 @@ const levelName = element<HTMLElement>('#level-name');
 const levelRule = element<HTMLElement>('#level-rule');
 const commentator = element<HTMLElement>('#commentator');
 const nextButton = element<HTMLButtonElement>('#next-button');
+const recoverButton = element<HTMLButtonElement>('#recover-button');
 const pauseButton = element<HTMLButtonElement>('#pause-button');
 const restartButton = element<HTMLButtonElement>('#restart-button');
 const hitButton = element<HTMLButtonElement>('#hit-button');
@@ -104,6 +118,7 @@ const angleOutput = element<HTMLOutputElement>('#angle-output');
 const powerOutput = element<HTMLOutputElement>('#power-output');
 const levelSelect = element<HTMLDivElement>('#level-select');
 const highscoreValue = element<HTMLElement>('#highscore-value');
+const holeBestsValue = element<HTMLElement>('#hole-bests-value');
 const audioToggle = element<HTMLInputElement>('#audio-toggle');
 const resetProgressButton = element<HTMLButtonElement>('#reset-progress');
 
@@ -187,7 +202,11 @@ function updateProgressView(): void {
     button.classList.toggle('active', currentState?.level === level.id);
   }
   highscoreValue.textContent =
-    progress.totalBest === null ? 'Not completed' : `${progress.totalBest} strokes`;
+    progress.bestRound === null ? 'Not completed' : `${progress.bestRound} strokes`;
+  holeBestsValue.textContent =
+    progress.combinedHoleBests === null
+      ? 'Not completed'
+      : `${progress.combinedHoleBests} strokes`;
 }
 
 const game = new Game(canvas, levels, 1, {
@@ -212,6 +231,7 @@ const game = new Game(canvas, levels, 1, {
     commentator.classList.remove('warning');
     commentator.classList.add('error');
     commentator.textContent = message;
+    recoverButton.hidden = false;
   },
   onWarning: showWarning,
   onLevelStart(level) {
@@ -243,6 +263,9 @@ const game = new Game(canvas, levels, 1, {
     updateProgressView();
   },
   onFinalComplete(strokes) {
+    progress = recordRoundScore(progress, strokes);
+    if (!saveProgress(progress)) showWarning('Round highscore could not be stored in this browser.');
+    updateProgressView();
     const totalPar = levels.levels.reduce((sum, level) => sum + level.par, 0);
     const title = trumpRuntime?.roundTitle(strokes, totalPar) ?? 'ROUND COMPLETE';
     pendingFinalMessage = `${title} — ${strokes} strokes.`;
@@ -264,6 +287,7 @@ hitButton.addEventListener('click', () => void game.strikeCurrentAim());
 restartButton.addEventListener('click', () => void game.restart());
 pauseButton.addEventListener('click', () => game.togglePause());
 nextButton.addEventListener('click', () => void game.nextLevel());
+recoverButton.addEventListener('click', () => window.location.reload());
 audioToggle.addEventListener('change', () => game.setAudioEnabled(audioToggle.checked));
 resetProgressButton.addEventListener('click', () => {
   progress = resetProgress();

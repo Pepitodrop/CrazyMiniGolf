@@ -38,6 +38,32 @@ describe('InputManager', () => {
     manager.dispose();
   });
 
+  it('does not hijack keys while an interactive control is focused', () => {
+    const canvas = document.createElement('canvas');
+    const input = document.createElement('input');
+    document.body.append(input);
+    Object.defineProperty(canvas, 'setPointerCapture', { value: vi.fn() });
+    const onAim = vi.fn();
+    const onStrike = vi.fn();
+    const manager = new InputManager(canvas, {
+      canAim: () => true,
+      getBallPosition: () => ({ x: 0, y: 0 }),
+      toWorld: (x, y) => ({ x, y }),
+      onAim,
+      onStrike,
+      onRestart: vi.fn(),
+      onPause: vi.fn(),
+    });
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+
+    expect(onAim).not.toHaveBeenCalled();
+    expect(onStrike).not.toHaveBeenCalled();
+    manager.dispose();
+    input.remove();
+  });
+
   it('converts pointer distance to a clamped strike strength', () => {
     const canvas = document.createElement('canvas');
     Object.defineProperty(canvas, 'setPointerCapture', { value: vi.fn() });

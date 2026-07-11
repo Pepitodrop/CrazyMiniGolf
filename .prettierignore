@@ -1,0 +1,4 @@
+dist
+coverage
+analysis/results
+src/brainfuck/engine.bf

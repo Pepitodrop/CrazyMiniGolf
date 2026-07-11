@@ -13,6 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan Git history for secrets
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 \
+            detect --source=/repo --no-banner --redact --exit-code=1
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -44,7 +50,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
           curl -fsSI http://127.0.0.1:8080/ | grep -qi '^content-security-policy:'
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps
       - run: npm run test:e2e
 
   r-analysis:

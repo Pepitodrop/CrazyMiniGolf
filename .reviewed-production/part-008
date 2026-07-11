@@ -197,5 +197,4 @@ index 2955dbf..8cf6fc5 100644
 +    level.specialRule !== undefined &&
 +    (typeof level.specialRule !== 'string' || level.specialRule.trim().length === 0)
 +  ) {
-+    errors.push('specialRule must be a non-empty string when provided.');
-+  }
++    errors.push('specialRule must be a non-empty string when provided.')

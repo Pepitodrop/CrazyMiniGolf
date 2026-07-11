@@ -1,0 +1,96 @@
+etEnabled(enabled: boolean): void {
+     this.enabled = enabled;
+   }
+ 
+-  private getContext(): AudioContext | null {
+-    if (!this.enabled) return null;
+-    this.context ??= new AudioContext();
+-    return this.context;
++  private getContext(): AudioContextLike | null {
++    if (!this.enabled || this.unavailable) return null;
++    try {
++      this.context ??= this.contextFactory();
++      if (this.context.state === 'suspended') void this.context.resume?.().catch(() => undefined);
++      return this.context;
++    } catch {
++      this.unavailable = true;
++      return null;
++    }
+   }
+ 
+-  tone(frequency: number, duration = 0.08, volume = 0.04): void {
++  tone(frequency: number, duration = 0.08, volume = 0.04): boolean {
+     const context = this.getContext();
+-    if (!context) return;
+-    const oscillator = context.createOscillator();
+-    const gain = context.createGain();
+-    oscillator.type = 'square';
+-    oscillator.frequency.value = frequency;
+-    gain.gain.setValueAtTime(volume, context.currentTime);
+-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+-    oscillator.connect(gain).connect(context.destination);
+-    oscillator.start();
+-    oscillator.stop(context.currentTime + duration);
++    if (!context) return false;
++    try {
++      const oscillator = context.createOscillator();
++      const gain = context.createGain();
++      oscillator.type = 'square';
++      oscillator.frequency.value = frequency;
++      gain.gain.setValueAtTime(volume, context.currentTime);
++      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
++      oscillator.connect(gain).connect(context.destination);
++      oscillator.start();
++      oscillator.stop(context.currentTime + duration);
++      return true;
++    } catch {
++      this.unavailable = true;
++      return false;
++    }
+   }
+ 
+   hit(strength: number): void {
+@@ -36,6 +61,11 @@ export class AudioManager {
+ 
+   hole(): void {
+     this.tone(523, 0.12);
+-    window.setTimeout(() => this.tone(784, 0.18), 90);
++    if (typeof window !== 'undefined') window.setTimeout(() => this.tone(784, 0.18), 90);
++  }
++
++  dispose(): void {
++    void this.context?.close?.().catch(() => undefined);
++    this.context = null;
+   }
+ }
+diff --git a/src/game/Game.ts b/src/game/Game.ts
+index 09bdb7b..6c9c8da 100644
+--- a/src/game/Game.ts
++++ b/src/game/Game.ts
+@@ -1,27 +1,81 @@
+ import { BrainfuckEngineClient } from '../brainfuck/EngineClient';
++import type { EngineCommand } from '../brainfuck/protocol';
+ import { createInitialState } from '../brainfuck/protocol';
+ import { AudioManager } from './AudioManager';
+ import { calculateCollisionSensors, isBallInHole } from './collision';
+-import { InputManager } from './InputManager';
++import { InputManager, type InputCallbacks } from './InputManager';
+ import type { LevelManager } from './LevelManager';
+ import { Renderer } from './Renderer';
+-import type { AimState, EngineState, LevelDefinition } from './types';
++import type { AimState, EngineState, LevelDefinition, Vec2 } from './types';
++
++export interface ShotTelemetry {
++  strength: number;
++  xActive: boolean;
++  yActive: boolean;
++  diagonal: boolean;
++}
+ 
+ export interface GameEvents {
+   onState(state: EngineState, level: LevelDefinition, paused: boolean): void;
+   onMessage(message: string): void;
+   onError(message: string): void;
++  onWarning?(message: string): void;
++  onLevelStart?(level: LevelDefinition): void;
++  onShot?(shot: ShotTel

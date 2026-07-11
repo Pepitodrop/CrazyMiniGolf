@@ -1,0 +1,205 @@
+) => this.events.onLevelStart?.(this.level));
++    this.emitState();
++    this.animationFrame = this.requestFrame(this.frame);
+   }
+ 
+   private readonly frame = (timestamp: number): void => {
+@@ -79,13 +142,21 @@ export class Game {
+       timestamp - this.lastPhysicsTick >= 70
+     ) {
+       this.lastPhysicsTick = timestamp;
+-      void this.physicsTick();
++      void this.advancePhysics();
+     }
+     this.renderer.render(this.level, this.state, this.aim, this.paused, this.errorMessage);
+-    this.animationFrame = requestAnimationFrame(this.frame);
++    this.animationFrame = this.requestFrame(this.frame);
+   };
+ 
+-  private async physicsTick(): Promise<void> {
++  async advancePhysics(): Promise<void> {
++    if (
++      this.engineBusy ||
++      this.paused ||
++      this.errorMessage ||
++      this.state.velocityX + this.state.velocityY === 0
++    ) {
++      return;
++    }
+     this.engineBusy = true;
+     try {
+       const level = this.level;
+@@ -97,32 +168,47 @@ export class Game {
+         this.state.velocityY,
+         this.state.velocityYNegative,
+       );
+-      const holeSensor = isBallInHole(
++      const holeSensorBeforeMove = isBallInHole(
+         level,
+         { x: this.state.x, y: this.state.y },
+         this.state.movingValue,
+       );
+       this.physicsCounter += 1;
+       const frictionPulse = this.physicsCounter % 3 === 0;
+-      const next = await this.engine.run({
++
++      const tickState = await this.executeEngine({
+         state: this.state,
+         tick: true,
+         blockX: sensors.blockX,
+         blockY: sensors.blockY,
+         decayX: frictionPulse && this.state.velocityX > 0,
+         decayY: frictionPulse && this.state.velocityY > 0,
+-        holeSensor,
++        holeSensor: holeSensorBeforeMove,
+         maxLevel: this.levels.count,
+       });
+-      this.state = next;
+-      if (next.collision) {
+-        this.audio.bounce();
+-        this.events.onMessage('BOUNCE');
++      if (!tickState) return;
++
++      this.state = tickState;
++      if (
++        !this.state.levelComplete &&
++        isBallInHole(level, { x: this.state.x, y: this.state.y }, this.state.movingValue)
++      ) {
++        const capturedState = await this.executeEngine({
++          state: this.state,
++          holeSensor: true,
++          maxLevel: this.levels.count,
++        });
++        if (!capturedState) return;
++        this.state = capturedState;
+       }
+-      this.events.onState(this.state, this.level, this.paused);
+-      if (next.levelComplete && !this.completionHandled) this.handleCompletion();
+-    } catch (error) {
+-      this.fail(error);
++
++      if (this.state.collision) {
++        this.safeAudio('bounce', () => this.audio.bounce());
++        this.emit('bounce event', () => this.events.onBounce?.());
++        this.emitMessage('BOUNCE');
++      }
++      this.emitState();
++      if (this.state.levelComplete && !this.completionHandled) this.handleCompletion();
+     } finally {
+       this.engineBusy = false;
+     }
+@@ -130,13 +216,22 @@ export class Game {
+ 
+   private handleCompletion(): void {
+     this.completionHandled = true;
+-    this.finalTotal += this.state.strokes;
+-    this.audio.hole();
+-    this.events.onLevelComplete(this.level, this.state.strokes);
+-    this.events.onMessage(this.state.strokes === 1 ? 'ACE' : 'HOLE');
++    this.roundScores.set(this.state.level, this.state.strokes);
++    this.safeAudio('hole', () => this.audio.hole());
++    this.emit('level completion', () =>
++      this.events.onLevelComplete(this.level, this.state.strokes),
++    );
++    this.emitMessage(this.state.strokes === 1 ? 'ACE' : 'HOLE');
++
+     if (this.state.level === this.levels.count) {
+-      this.events.onFinalComplete(this.finalTotal);
+-      this.events.onMessage('FINAL');
++      if (this.roundScores.size === this.levels.count) {
++        const total = [...this.roundScores.values()].reduce((sum, strokes) => sum + strokes, 0);
++        this.emit('round completion', () => this.events.onFinalComplete(total));
++        this.emitMessage('FINAL');
++        this.roundScores.clear();
++      } else {
++        this.warn('Finish all nine levels in one continuous round to record a round total.');
++      }
+     }
+   }
+ 
+@@ -175,7 +270,7 @@ export class Game {
+ 
+   setAim(aim: AimState): void {
+     this.aim = aim;
+-    this.events.onState(this.state, this.level, this.paused);
++    this.emitState();
+   }
+ 
+   setMobileAim(angleDegrees: number, strength: number): void {
+@@ -192,17 +287,26 @@ export class Game {
+     try {
+       this.aim = aim;
+       const quantized = this.quantizeAim(aim);
+-      this.state = await this.engine.run({
++      const nextState = await this.executeEngine({
+         state: this.state,
+         aim: quantized,
+         strike: true,
+         maxLevel: this.levels.count,
+       });
+-      this.audio.hit(quantized.strength);
+-      this.events.onMessage('HIT');
+-      this.events.onState(this.state, this.level, this.paused);
+-    } catch (error) {
+-      this.fail(error);
++      if (nextState) {
++        this.state = nextState;
++        this.safeAudio('hit', () => this.audio.hit(quantized.strength));
++        this.emit('shot telemetry', () =>
++          this.events.onShot?.({
++            strength: quantized.strength,
++            xActive: quantized.xActive,
++            yActive: quantized.yActive,
++            diagonal: quantized.xActive && quantized.yActive,
++          }),
++        );
++        this.emitMessage('HIT');
++        this.emitState();
++      }
+     } finally {
+       this.engineBusy = false;
+     }
+@@ -212,18 +316,20 @@ export class Game {
+     if (this.engineBusy) return;
+     this.engineBusy = true;
+     try {
+-      this.state = await this.engine.run({
++      const nextState = await this.executeEngine({
+         state: this.state,
+         reset: this.level.start,
+         maxLevel: this.levels.count,
+       });
+-      this.completionHandled = false;
+-      this.paused = false;
+-      this.physicsCounter = 0;
+-      this.events.onMessage('START');
+-      this.events.onState(this.state, this.level, this.paused);
+-    } catch (error) {
+-      this.fail(error);
++      if (nextState) {
++        this.state = nextState;
++        this.completionHandled = false;
++        this.paused = false;
++        this.physicsCounter = 0;
++        this.emit('level start', () => this.events.onLevelStart?.(this.level));
++        this.emitMessage('START');
++        this.emitState();
++      }
+     } finally {
+       this.engineBusy = false;
+     }
+@@ -234,18 +340,22 @@ export class Game {
+     const nextLevel = this.levels.getById(levelId);
+     this.engineBusy = true;
+     try {
+-      this.state = await this.engine.run({
++      const nextState = await this.executeEngine({
+         state: { ...this.state, level: nextLevel.id },
+         reset: nextLevel.start,
+         maxLevel: this.levels.count,
+       });
+-      this.completionHandled = false;
+-      this.paused = false;
+-      this.physicsCounter = 0;
+-      this.events.onMessage('START');
+-

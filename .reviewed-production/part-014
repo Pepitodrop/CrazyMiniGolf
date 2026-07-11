@@ -1,0 +1,219 @@
+t(down);
++    canvas.dispatchEvent(up);
++
++    expect(onStrike).toHaveBeenCalledWith({ direction: { x: 1, y: 0 }, strength: 14 });
++    manager.dispose();
++  });
++});
+diff --git a/tests/levels.test.ts b/tests/levels.test.ts
+index 2a7a866..7ff2462 100644
+--- a/tests/levels.test.ts
++++ b/tests/levels.test.ts
+@@ -1,5 +1,6 @@
+ import { describe, expect, it } from 'vitest';
+ import rawLevels from '../src/levels/levels.json';
++import { LevelManager } from '../src/game/LevelManager';
+ import { parseLevels, validateLevel } from '../src/levels/schema';
+ 
+ describe('level data', () => {
+@@ -11,7 +12,30 @@ describe('level data', () => {
+     expect(levels.at(-1)?.par).toBeGreaterThan(levels[0]?.par ?? 0);
+   });
+ 
+-  it('rejects malformed levels', () => {
+-    expect(() => parseLevels([{ id: 1 }])).toThrow(/Expected 9 levels/);
++  it('rejects malformed and out-of-bounds level geometry', () => {
++    const invalid = {
++      ...rawLevels[0],
++      id: 20,
++      par: -5,
++      obstacles: [{ type: 'rect', x: -999, y: 10, width: 20, height: 20 }],
++    };
++    const errors = validateLevel(invalid);
++    expect(errors).toContain('id must be between 1 and 9.');
++    expect(errors).toContain('par must be between 1 and 20.');
++    expect(errors.some((error) => error.includes('lies outside'))).toBe(true);
++  });
++
++  it('requires ids to be exactly one through nine', () => {
++    const shifted = rawLevels.map((level, index) => ({ ...level, id: index + 20 }));
++    expect(() => parseLevels(shifted)).toThrow(/exactly 1 through 9/);
++  });
++
++  it('provides deterministic level lookup with useful errors', () => {
++    const manager = new LevelManager();
++    expect(manager.count).toBe(9);
++    expect(manager.getByIndex(0).id).toBe(1);
++    expect(manager.getById(9).name).toBe('Segfault Summit');
++    expect(() => manager.getByIndex(99)).toThrow(/Unknown level index/);
++    expect(() => manager.getById(99)).toThrow(/Unknown level id/);
+   });
+ });
+diff --git a/tests/renderer.test.ts b/tests/renderer.test.ts
+new file mode 100644
+index 0000000..60f8683
+--- /dev/null
++++ b/tests/renderer.test.ts
+@@ -0,0 +1,94 @@
++// @vitest-environment jsdom
++
++import { describe, expect, it, vi } from 'vitest';
++import { Renderer } from '../src/game/Renderer';
++import { createInitialState } from '../src/brainfuck/protocol';
++import type { LevelDefinition } from '../src/game/types';
++
++const level: LevelDefinition = {
++  id: 1,
++  name: 'Render Test',
++  width: 200,
++  height: 100,
++  start: { x: 20, y: 50 },
++  hole: { x: 180, y: 50 },
++  holeRadius: 7,
++  ballRadius: 4,
++  par: 2,
++  obstacles: [
++    { type: 'rect', x: 80, y: 20, width: 20, height: 20 },
++    { type: 'circle', x: 120, y: 60, radius: 10 },
++  ],
++};
++
++function fakeContext(): {
++  context: CanvasRenderingContext2D;
++  fillRect: ReturnType<typeof vi.fn>;
++  arc: ReturnType<typeof vi.fn>;
++} {
++  const gradient = { addColorStop: vi.fn() };
++  const methods = [
++    'clearRect',
++    'fillRect',
++    'strokeRect',
++    'save',
++    'restore',
++    'translate',
++    'scale',
++    'beginPath',
++    'moveTo',
++    'lineTo',
++    'stroke',
++    'arc',
++    'fill',
++    'closePath',
++    'setLineDash',
++    'fillText',
++  ];
++  const target: Record<string, unknown> = {
++    createLinearGradient: () => gradient,
++  };
++  for (const method of methods) target[method] = vi.fn();
++  return {
++    context: target as unknown as CanvasRenderingContext2D,
++    fillRect: target.fillRect as ReturnType<typeof vi.fn>,
++    arc: target.arc as ReturnType<typeof vi.fn>,
++  };
++}
++
++describe('Renderer', () => {
++  it('maps client coordinates into world coordinates and renders all shapes', () => {
++    const canvas = document.createElement('canvas');
++    const { context, fillRect, arc } = fakeContext();
++    vi.spyOn(canvas, 'getContext').mockReturnValue(context);
++    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
++      x: 0,
++      y: 0,
++      left: 0,
++      top: 0,
++      right: 400,
++      bottom: 240,
++      width: 400,
++      height: 240,
++      toJSON: () => ({}),
++    });
++    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
++    const renderer = new Renderer(canvas);
++
++    const world = renderer.toWorld(level, 200, 120);
++    expect(world.x).toBeCloseTo(100);
++    expect(world.y).toBeCloseTo(50);
++
++    expect(() =>
++      renderer.render(
++        level,
++        createInitialState(1, level.start),
++        { direction: { x: 1, y: 0 }, strength: 7 },
++        false,
++        null,
++      ),
++    ).not.toThrow();
++    expect(fillRect).toHaveBeenCalled();
++    expect(arc).toHaveBeenCalled();
++  });
++});
+diff --git a/tests/scores.test.ts b/tests/scores.test.ts
+index 9b1010e..0773bcc 100644
+--- a/tests/scores.test.ts
++++ b/tests/scores.test.ts
+@@ -33,6 +33,16 @@ describe('local score storage', () => {
+     expect(loadProgress(storage)).toEqual(progress);
+   });
+ 
++  it('returns false instead of throwing when storage writes are blocked', () => {
++    const storage: StorageLike = {
++      getItem: () => null,
++      setItem: () => {
++        throw new Error('blocked');
++      },
++    };
++    expect(saveProgress(emptyProgress(), storage)).toBe(false);
++  });
++
+   it('computes a total highscore after all nine levels', () => {
+     let progress = emptyProgress();
+     for (let id = 1; id <= 9; id += 1) progress = recordLevelScore(progress, id, id + 1, id);
+diff --git a/tests/trump-controller.test.ts b/tests/trump-controller.test.ts
+new file mode 100644
+index 0000000..356546c
+--- /dev/null
++++ b/tests/trump-controller.test.ts
+@@ -0,0 +1,70 @@
++// @vitest-environment jsdom
++
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { TrumpFeatureController } from '../src/trumpscript/controller';
++import type { TrumpFeature, TrumpGameplayContext } from '../src/trumpscript/runtime';
++
++const feature: TrumpFeature = {
++  id: 'diagonal-test',
++  kind: 'CHALLENGE',
++  levelId: 2,
++  title: 'Diagonal Test',
++  conditions: [{ type: 'DIAGONAL_SHOTS_AT_LEAST', value: 1 }],
++  points: 75,
++  message: 'Diagonal telemetry works.',
++};
++
++beforeEach(() => {
++  localStorage.clear();
++  document.body.innerHTML = `
++    <main class="shell">
++      <section class="hud"></section>
++      <div class="canvas-card"></div>
++      <aside class="side-panel">
++        <section class="mobile-controls"></section>
++        <section class="help"></section>
++        <button id="reset-progress"></button>
++      </aside>
++    </main>
++  `;
++});
++
++describe('TrumpFeatureController', () => {
++  it('uses explicit shot telemetry and updates optional UI', async () => {
++    let captured: TrumpGameplayContext | null = null;
++    const evaluate = vi.fn((context: TrumpGameplayContext) => {
++      captured = { ...context };
++      return context.diagonalShots >= 1 ? [feature] : [];
++    });
++    const controller = new TrumpFeatureController({
++      tip: () => 'Typed telemetry only.',
++      theme: () => ({ accent: '#123456', secondary: '#abc

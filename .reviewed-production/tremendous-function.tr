@@ -1,0 +1,5 @@
+# A deliberately theatrical TrumpScript-compatible speech function.
+# It reads the real strokes and par, computes a harmless nonsense metric,
+# and returns commentary only. It cannot change the authoritative golf score.
+
+MAKE FUNCTION tremendous-deal GREAT AGAIN WITH STROKES AND PAR SAY "Look, we had {STROKES} strokes. Very strong strokes, beautiful strokes. Par was {PAR}, although many people are saying the par was counted very unfairly. The result is {RESULT}. The margin is {MARGIN}, which is a tremendous margin when you look at it the right way. Then we add forty-five, subtract the wind even though the wind is not a number, multiply it by winning, and the function gives us {TREMENDOUS_NUMBER}. Nobody knows exactly what that number means, but it is a very powerful number and the experts are honestly amazed."

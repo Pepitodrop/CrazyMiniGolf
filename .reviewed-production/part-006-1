@@ -1,0 +1,99 @@
+emetry): void;
++  onBounce?(): void;
++  onRoundReset?(): void;
+   onLevelComplete(level: LevelDefinition, strokes: number): void;
+   onFinalComplete(strokes: number): void;
+ }
+ 
++export interface GameEnginePort {
++  run(command: EngineCommand): Promise<EngineState>;
++  dispose(): void;
++}
++
++export interface RendererPort {
++  toWorld(level: LevelDefinition, clientX: number, clientY: number): Vec2;
++  render(
++    level: LevelDefinition,
++    state: EngineState,
++    aim: AimState,
++    paused: boolean,
++    errorMessage: string | null,
++  ): void;
++}
++
++export interface InputPort {
++  setMobileAim(angleDegrees: number, strength: number): AimState;
++  dispose(): void;
++}
++
++export interface AudioPort {
++  setEnabled(enabled: boolean): void;
++  hit(strength: number): void;
++  bounce(): void;
++  hole(): void;
++  dispose?(): void;
++}
++
++export interface GameDependencies {
++  engine?: GameEnginePort;
++  renderer?: RendererPort;
++  inputFactory?: (canvas: HTMLCanvasElement, callbacks: InputCallbacks) => InputPort;
++  audio?: AudioPort;
++  requestFrame?: (callback: FrameRequestCallback) => number;
++  cancelFrame?: (handle: number) => void;
++}
++
+ const DEFAULT_AIM: AimState = { direction: { x: 1, y: 0 }, strength: 7 };
+ 
+ export class Game {
+-  private readonly engine = new BrainfuckEngineClient();
+-  private readonly renderer: Renderer;
+-  private readonly input: InputManager;
+-  private readonly audio = new AudioManager();
++  private readonly engine: GameEnginePort;
++  private readonly renderer: RendererPort;
++  private readonly input: InputPort;
++  private readonly audio: AudioPort;
++  private readonly requestFrame: (callback: FrameRequestCallback) => number;
++  private readonly cancelFrame: (handle: number) => void;
++  private readonly roundScores = new Map<number, number>();
+   private state: EngineState;
+   private aim: AimState = DEFAULT_AIM;
+   private paused = false;
+@@ -31,18 +85,26 @@ export class Game {
+   private physicsCounter = 0;
+   private engineBusy = false;
+   private completionHandled = false;
+-  private finalTotal = 0;
+ 
+   constructor(
+     canvas: HTMLCanvasElement,
+     private readonly levels: LevelManager,
+     initialLevelId: number,
+     private readonly events: GameEvents,
++    dependencies: GameDependencies = {},
+   ) {
+     const level = levels.getById(initialLevelId);
+     this.state = createInitialState(level.id, level.start);
+-    this.renderer = new Renderer(canvas);
+-    this.input = new InputManager(canvas, {
++    this.engine = dependencies.engine ?? new BrainfuckEngineClient();
++    this.renderer = dependencies.renderer ?? new Renderer(canvas);
++    this.audio = dependencies.audio ?? new AudioManager();
++    this.requestFrame = dependencies.requestFrame ?? requestAnimationFrame.bind(globalThis);
++    this.cancelFrame = dependencies.cancelFrame ?? cancelAnimationFrame.bind(globalThis);
++    const inputFactory =
++      dependencies.inputFactory ??
++      ((target: HTMLCanvasElement, callbacks: InputCallbacks) =>
++        new InputManager(target, callbacks));
++    this.input = inputFactory(canvas, {
+       canAim: () => this.canAim(),
+       getBallPosition: () => ({ x: this.state.x, y: this.state.y }),
+       toWorld: (clientX, clientY) => this.renderer.toWorld(this.level, clientX, clientY),
+@@ -66,8 +128,9 @@ export class Game {
+   }
+ 
+   start(): void {
+-    this.events.onState(this.state, this.level, this.paused);
+-    this.animationFrame = requestAnimationFrame(this.frame);
++    this.emit('level start', (

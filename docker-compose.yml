@@ -1,0 +1,15 @@
+services:
+  crazy-mini-golf:
+    build:
+      context: .
+    image: ghcr.io/pepitodrop/crazy-mini-golf:latest
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    ports:
+      - "8080:8080"

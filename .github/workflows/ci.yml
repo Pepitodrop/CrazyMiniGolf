@@ -25,6 +25,25 @@ jobs:
       - run: npm run validate:levels
       - run: npm run test:coverage
       - run: npm run build
+      - name: Build production container
+        run: docker build --tag crazy-mini-golf:ci .
+      - name: Smoke-test production container
+        run: |
+          set -euo pipefail
+          docker run -d --name crazy-mini-golf-ci -p 8080:8080 crazy-mini-golf:ci
+          trap 'docker rm -f crazy-mini-golf-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs crazy-mini-golf-ci
+              exit 1
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
+          curl -fsSI http://127.0.0.1:8080/ | grep -qi '^content-security-policy:'
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
 

@@ -204,9 +204,7 @@ function updateProgressView(): void {
   highscoreValue.textContent =
     progress.bestRound === null ? 'Not completed' : `${progress.bestRound} strokes`;
   holeBestsValue.textContent =
-    progress.combinedHoleBests === null
-      ? 'Not completed'
-      : `${progress.combinedHoleBests} strokes`;
+    progress.combinedHoleBests === null ? 'Not completed' : `${progress.combinedHoleBests} strokes`;
 }
 
 const game = new Game(canvas, levels, 1, {
@@ -264,7 +262,8 @@ const game = new Game(canvas, levels, 1, {
   },
   onFinalComplete(strokes) {
     progress = recordRoundScore(progress, strokes);
-    if (!saveProgress(progress)) showWarning('Round highscore could not be stored in this browser.');
+    if (!saveProgress(progress))
+      showWarning('Round highscore could not be stored in this browser.');
     updateProgressView();
     const totalPar = levels.levels.reduce((sum, level) => sum + level.par, 0);
     const title = trumpRuntime?.roundTitle(strokes, totalPar) ?? 'ROUND COMPLETE';

@@ -19,14 +19,14 @@ Crazy Mini Golf is a complete nine-hole browser minigolf game whose authoritativ
 
 ## Architecture and language boundaries
 
-| Language or layer | Responsibility |
-| --- | --- |
-| **Brainfuck** | Authoritative level, position, velocity, strike, stroke, friction, collision response, hole, reset, and progression state transitions |
-| **TypeScript** | Interpreter safety, worker transport, browser input, Canvas rendering, geometry sensors, audio, UI, errors, and Local Storage |
-| **JSON** | Nine declarative levels and obstacles |
-| **R** | Offline balancing simulation and expected-stroke estimates |
-| **TrumpScript-compatible grammar** | Optional, non-critical commentary, themes, challenges, medals, and parody speech output |
-| **Vite and Nginx** | Production bundling and hardened static delivery |
+| Language or layer                  | Responsibility                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Brainfuck**                      | Authoritative level, position, velocity, strike, stroke, friction, collision response, hole, reset, and progression state transitions |
+| **TypeScript**                     | Interpreter safety, worker transport, browser input, Canvas rendering, geometry sensors, audio, UI, errors, and Local Storage         |
+| **JSON**                           | Nine declarative levels and obstacles                                                                                                 |
+| **R**                              | Offline balancing simulation and expected-stroke estimates                                                                            |
+| **TrumpScript-compatible grammar** | Optional, non-critical commentary, themes, challenges, medals, and parody speech output                                               |
+| **Vite and Nginx**                 | Production bundling and hardened static delivery                                                                                      |
 
 `src/brainfuck/engine.bf` is not decorative. It is generated deterministically and executed for every strike, physics tick, reset, hole capture, and level transition. Arbitrary rectangle and circle intersection tests remain in TypeScript; their compact sensor bits are passed into Brainfuck, which owns the resulting state transition.
 

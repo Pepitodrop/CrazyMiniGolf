@@ -40,14 +40,19 @@ jobs:
               "      `Brainfuck engine returned ${output.length} bytes; expected ${ENGINE_OUTPUT_BYTES}.`,",
               "      \\`Brainfuck engine returned \\${output.length} bytes; expected \\${ENGINE_OUTPUT_BYTES}.\\`,",
           )
-          source = source.replace(
+          path.write_text(source)
+          PY
+          node --check scripts/apply-gameplay-fixes.mjs
+          node scripts/apply-gameplay-fixes.mjs 2>&1 | tee gameplay-apply.log
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/game.test.ts')
+          source = path.read_text().replace(
               "expect(engine.calls[0]?.holeSensor).toBe(false);",
               "expect(engine.calls[0]?.holeSensor).toBeUndefined();",
           )
           path.write_text(source)
           PY
-          node --check scripts/apply-gameplay-fixes.mjs
-          node scripts/apply-gameplay-fixes.mjs 2>&1 | tee gameplay-apply.log
           rm -f scripts/apply-gameplay-fixes.mjs
           rm -f .github/workflows/apply-gameplay-fixes.yml
       - name: Upload apply diagnostics

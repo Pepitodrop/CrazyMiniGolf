@@ -1,8 +1,9 @@
 import { BrainfuckEngineClient } from '../brainfuck/EngineClient';
 import type { EngineCommand } from '../brainfuck/protocol';
 import { createInitialState } from '../brainfuck/protocol';
+import { snapAim, toEngineAimVector } from './aim';
 import { AudioManager } from './AudioManager';
-import { calculateCollisionSensors, isBallInHole } from './collision';
+import { calculateCollisionSensors, isBallInHole, isBallWithinHole } from './collision';
 import { InputManager, type InputCallbacks } from './InputManager';
 import type { LevelManager } from './LevelManager';
 import { Renderer } from './Renderer';
@@ -23,6 +24,7 @@ export interface GameEvents {
   onLevelStart?(level: LevelDefinition): void;
   onShot?(shot: ShotTelemetry): void;
   onBounce?(): void;
+  onHoleSpeed?(tooFast: boolean): void;
   onRoundReset?(): void;
   onLevelComplete(level: LevelDefinition, strokes: number): void;
   onFinalComplete(strokes: number): void;
@@ -85,6 +87,7 @@ export class Game {
   private physicsCounter = 0;
   private engineBusy = false;
   private completionHandled = false;
+  private fastHolePass = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -189,6 +192,8 @@ export class Game {
       if (!tickState) return;
 
       this.state = tickState;
+      const overHole = isBallWithinHole(level, { x: this.state.x, y: this.state.y });
+      this.setFastHoleIndicator(overHole && this.state.movingValue > 2);
       if (
         !this.state.levelComplete &&
         isBallInHole(level, { x: this.state.x, y: this.state.y }, this.state.movingValue)
@@ -200,6 +205,7 @@ export class Game {
         });
         if (!capturedState) return;
         this.state = capturedState;
+        this.setFastHoleIndicator(false);
       }
 
       if (this.state.collision) {
@@ -235,30 +241,6 @@ export class Game {
     }
   }
 
-  private quantizeAim(aim: AimState): {
-    xActive: boolean;
-    xNegative: boolean;
-    yActive: boolean;
-    yNegative: boolean;
-    strength: number;
-  } {
-    const absX = Math.abs(aim.direction.x);
-    const absY = Math.abs(aim.direction.y);
-    let xActive = absX >= 0.38;
-    let yActive = absY >= 0.38;
-    if (!xActive && !yActive) {
-      xActive = absX >= absY;
-      yActive = !xActive;
-    }
-    return {
-      xActive,
-      xNegative: aim.direction.x < 0,
-      yActive,
-      yNegative: aim.direction.y < 0,
-      strength: Math.max(2, Math.min(14, Math.round(aim.strength))),
-    };
-  }
-
   private canAim(): boolean {
     return (
       !this.paused &&
@@ -269,7 +251,7 @@ export class Game {
   }
 
   setAim(aim: AimState): void {
-    this.aim = aim;
+    this.aim = snapAim(aim);
     this.emitState();
   }
 
@@ -285,23 +267,24 @@ export class Game {
     if (!this.canAim()) return;
     this.engineBusy = true;
     try {
-      this.aim = aim;
-      const quantized = this.quantizeAim(aim);
+      this.aim = snapAim(aim);
+      const engineAim = toEngineAimVector(this.aim);
+      this.setFastHoleIndicator(false);
       const nextState = await this.executeEngine({
         state: this.state,
-        aim: quantized,
+        aim: engineAim,
         strike: true,
         maxLevel: this.levels.count,
       });
       if (nextState) {
         this.state = nextState;
-        this.safeAudio('hit', () => this.audio.hit(quantized.strength));
+        this.safeAudio('hit', () => this.audio.hit(engineAim.strength));
         this.emit('shot telemetry', () =>
           this.events.onShot?.({
-            strength: quantized.strength,
-            xActive: quantized.xActive,
-            yActive: quantized.yActive,
-            diagonal: quantized.xActive && quantized.yActive,
+            strength: engineAim.strength,
+            xActive: engineAim.velocityX > 0,
+            yActive: engineAim.velocityY > 0,
+            diagonal: engineAim.velocityX > 0 && engineAim.velocityY > 0,
           }),
         );
         this.emitMessage('HIT');
@@ -326,6 +309,7 @@ export class Game {
         this.completionHandled = false;
         this.paused = false;
         this.physicsCounter = 0;
+        this.setFastHoleIndicator(false);
         this.emit('level start', () => this.events.onLevelStart?.(this.level));
         this.emitMessage('START');
         this.emitState();
@@ -352,6 +336,7 @@ export class Game {
         this.completionHandled = false;
         this.paused = false;
         this.physicsCounter = 0;
+        this.setFastHoleIndicator(false);
         this.emit('level start', () => this.events.onLevelStart?.(this.level));
         this.emitMessage('START');
         this.emitState();
@@ -377,6 +362,7 @@ export class Game {
         this.state = nextState;
         this.completionHandled = false;
         this.physicsCounter = 0;
+        this.setFastHoleIndicator(false);
         this.emit('level start', () => this.events.onLevelStart?.(this.level));
         this.emitMessage('START');
         this.emitState();
@@ -403,6 +389,12 @@ export class Game {
       this.failEngine(error);
       return null;
     }
+  }
+
+  private setFastHoleIndicator(tooFast: boolean): void {
+    if (this.fastHolePass === tooFast) return;
+    this.fastHolePass = tooFast;
+    this.emit('hole speed indicator', () => this.events.onHoleSpeed?.(tooFast));
   }
 
   private emitState(): void {

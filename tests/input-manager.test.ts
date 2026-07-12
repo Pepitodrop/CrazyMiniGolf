@@ -5,7 +5,7 @@ import { InputManager } from '../src/game/InputManager';
 import type { AimState } from '../src/game/types';
 
 describe('InputManager', () => {
-  it('handles keyboard aiming, striking, restart and pause', () => {
+  it('handles five-degree keyboard aiming, striking, restart and pause', () => {
     const canvas = document.createElement('canvas');
     Object.defineProperty(canvas, 'setPointerCapture', { value: vi.fn() });
     const onAim = vi.fn();
@@ -31,8 +31,8 @@ describe('InputManager', () => {
     expect(onAim).toHaveBeenCalled();
     const shot = onStrike.mock.calls[0]?.[0] as AimState | undefined;
     expect(shot?.strength).toBe(8);
-    expect(shot?.direction.x).toBeCloseTo(Math.SQRT1_2);
-    expect(shot?.direction.y).toBeCloseTo(Math.SQRT1_2);
+    expect(shot?.direction.x).toBeCloseTo(Math.cos((5 * Math.PI) / 180));
+    expect(shot?.direction.y).toBeCloseTo(Math.sin((5 * Math.PI) / 180));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(onPause).toHaveBeenCalledTimes(1);
     manager.dispose();
@@ -64,15 +64,16 @@ describe('InputManager', () => {
     input.remove();
   });
 
-  it('converts pointer distance to a clamped strike strength', () => {
+  it('snaps pointer aim to the same five-degree direction used for the strike', () => {
     const canvas = document.createElement('canvas');
     Object.defineProperty(canvas, 'setPointerCapture', { value: vi.fn() });
+    const onAim = vi.fn();
     const onStrike = vi.fn();
     const manager = new InputManager(canvas, {
       canAim: () => true,
       getBallPosition: () => ({ x: 10, y: 10 }),
       toWorld: (x, y) => ({ x, y }),
-      onAim: vi.fn(),
+      onAim,
       onStrike,
       onRestart: vi.fn(),
       onPause: vi.fn(),
@@ -82,18 +83,22 @@ describe('InputManager', () => {
     Object.defineProperties(down, {
       pointerId: { value: 1 },
       clientX: { value: 108 },
-      clientY: { value: 10 },
+      clientY: { value: 20 },
     });
     const up = new Event('pointerup') as PointerEvent;
     Object.defineProperties(up, {
       pointerId: { value: 1 },
       clientX: { value: 108 },
-      clientY: { value: 10 },
+      clientY: { value: 20 },
     });
     canvas.dispatchEvent(down);
     canvas.dispatchEvent(up);
 
-    expect(onStrike).toHaveBeenCalledWith({ direction: { x: 1, y: 0 }, strength: 14 });
+    const preview = onAim.mock.calls.at(-1)?.[0] as AimState;
+    const strike = onStrike.mock.calls[0]?.[0] as AimState;
+    expect(strike).toEqual(preview);
+    expect(strike.strength).toBe(14);
+    expect(Math.atan2(strike.direction.y, strike.direction.x) * (180 / Math.PI)).toBeCloseTo(5);
     manager.dispose();
   });
 });

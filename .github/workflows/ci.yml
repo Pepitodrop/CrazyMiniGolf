@@ -51,7 +51,21 @@ jobs:
           curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
           curl -fsSI http://127.0.0.1:8080/ | grep -qi '^content-security-policy:'
       - run: npx playwright install --with-deps
-      - run: npm run test:e2e
+      - name: Run cross-browser E2E
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee playwright-e2e.log
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            playwright-e2e.log
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 2
 
   r-analysis:
     runs-on: ubuntu-latest

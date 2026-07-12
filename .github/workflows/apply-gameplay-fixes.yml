@@ -55,7 +55,17 @@ jobs:
       - run: npm run generate:engine
       - run: npm run format
       - run: npm run audit
-      - run: npm run lint
+      - name: Run lint
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee gameplay-lint.log
+      - name: Upload lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gameplay-lint-diagnostics
+          path: gameplay-lint.log
+          retention-days: 1
       - run: npm run check:engine
       - run: npm run validate:levels
       - run: npm run test:coverage
@@ -82,7 +92,7 @@ jobs:
         run: |
           rm -f scripts/apply-gameplay-fixes.mjs
           rm -f .github/workflows/apply-gameplay-fixes.yml
-          rm -f gameplay-apply.log
+          rm -f gameplay-apply.log gameplay-lint.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A

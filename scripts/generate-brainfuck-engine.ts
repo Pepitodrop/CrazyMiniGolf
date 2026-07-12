@@ -38,15 +38,13 @@ class BrainfuckBuilder {
     this.clear(destination);
     this.clear(temporary);
     this.at(source);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(destination, 1);
     this.add(temporary, 1);
     this.at(source);
     this.raw(']');
     this.at(temporary);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(source, 1);
     this.at(temporary);
     this.raw(']');
@@ -55,15 +53,13 @@ class BrainfuckBuilder {
   addPreserve(source: number, destination: number, temporary: number): void {
     this.clear(temporary);
     this.at(source);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(destination, 1);
     this.add(temporary, 1);
     this.at(source);
     this.raw(']');
     this.at(temporary);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(source, 1);
     this.at(temporary);
     this.raw(']');
@@ -72,15 +68,13 @@ class BrainfuckBuilder {
   subtractPreserve(source: number, destination: number, temporary: number): void {
     this.clear(temporary);
     this.at(source);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(destination, -1);
     this.add(temporary, 1);
     this.at(source);
     this.raw(']');
     this.at(temporary);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(source, 1);
     this.at(temporary);
     this.raw(']');
@@ -89,8 +83,7 @@ class BrainfuckBuilder {
   move(source: number, destination: number): void {
     this.clear(destination);
     this.at(source);
-    this.raw('[');
-    this.raw('-');
+    this.raw('[-');
     this.add(destination, 1);
     this.at(source);
     this.raw(']');
@@ -132,9 +125,9 @@ const CELL = {
   xNegative: 4,
   velocityY: 5,
   yNegative: 6,
-  aimXActive: 7,
+  aimVelocityX: 7,
   aimXNegative: 8,
-  aimYActive: 9,
+  aimVelocityY: 9,
   aimYNegative: 10,
   strength: 11,
   strokes: 12,
@@ -166,7 +159,6 @@ const CELL = {
 
 const builder = new BrainfuckBuilder();
 
-// Read exactly 32 protocol bytes.
 for (let cell = 0; cell < 32; cell += 1) {
   builder.at(cell);
   builder.raw(',');
@@ -215,29 +207,22 @@ const processAxis = (
   });
 };
 
-// Apply a strike. Strokes saturate at 255 instead of wrapping to zero.
 builder.ifConsume(CELL.strike, () => {
   builder.add(CELL.strokes, 1);
   builder.ifZeroPreserve(CELL.strokes, CELL.t0, CELL.t1, CELL.t2, () =>
     builder.add(CELL.strokes, -1),
   );
-  builder.ifConsume(CELL.aimXActive, () => {
-    builder.copyPreserve(CELL.strength, CELL.velocityX, CELL.t2);
-    builder.copyPreserve(CELL.aimXNegative, CELL.xNegative, CELL.t2);
-  });
-  builder.ifConsume(CELL.aimYActive, () => {
-    builder.copyPreserve(CELL.strength, CELL.velocityY, CELL.t2);
-    builder.copyPreserve(CELL.aimYNegative, CELL.yNegative, CELL.t2);
-  });
+  builder.copyPreserve(CELL.aimVelocityX, CELL.velocityX, CELL.t2);
+  builder.copyPreserve(CELL.aimXNegative, CELL.xNegative, CELL.t2);
+  builder.copyPreserve(CELL.aimVelocityY, CELL.velocityY, CELL.t2);
+  builder.copyPreserve(CELL.aimYNegative, CELL.yNegative, CELL.t2);
 });
 
-// Execute one deterministic integer physics tick.
 builder.ifConsume(CELL.tick, () => {
   processAxis(CELL.x, CELL.velocityX, CELL.xNegative, CELL.blockX, CELL.decayX);
   processAxis(CELL.y, CELL.velocityY, CELL.yNegative, CELL.blockY, CELL.decayY);
 });
 
-// Capture the ball and stop all motion.
 builder.ifConsume(CELL.holeSensor, () => {
   builder.set(CELL.inHole, 1);
   builder.set(CELL.complete, 1);
@@ -247,20 +232,17 @@ builder.ifConsume(CELL.holeSensor, () => {
   builder.clear(CELL.yNegative);
 });
 
-// Advance only when current level is below maxLevel.
 builder.ifConsume(CELL.advance, () => {
   builder.copyPreserve(CELL.maxLevel, CELL.t0, CELL.t2);
   builder.copyPreserve(CELL.level, CELL.t1, CELL.t2);
   builder.at(CELL.t1);
-  builder.raw('[');
-  builder.raw('-');
+  builder.raw('[-');
   builder.add(CELL.t0, -1);
   builder.at(CELL.t1);
   builder.raw(']');
   builder.ifConsume(CELL.t0, () => builder.add(CELL.level, 1));
 });
 
-// Reset per-level state after an optional level advance.
 builder.ifConsume(CELL.reset, () => {
   builder.move(CELL.resetX, CELL.x);
   builder.move(CELL.resetY, CELL.y);
@@ -279,7 +261,6 @@ builder.ifConsume(CELL.reset, () => {
   }
 });
 
-// Recompute the stationary/moving value from velocity magnitudes.
 builder.clear(CELL.moving);
 builder.addPreserve(CELL.velocityX, CELL.moving, CELL.t2);
 builder.addPreserve(CELL.velocityY, CELL.moving, CELL.t2);
@@ -312,8 +293,7 @@ const header = [
 ].join('\n');
 
 const destination = resolve('src/brainfuck/engine.bf');
-const generated = `${header}${builder.code}
-`;
+const generated = `${header}${builder.code}\n`;
 if (process.argv.includes('--check')) {
   const current = existsSync(destination) ? readFileSync(destination, 'utf8') : '';
   if (current !== generated) {

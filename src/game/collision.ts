@@ -26,6 +26,30 @@ function circleIntersectsCircle(
   return dx * dx + dy * dy <= combined * combined;
 }
 
+function distanceSquaredToSegment(point: Vec2, start: Vec2, end: Vec2): number {
+  const segmentX = end.x - start.x;
+  const segmentY = end.y - start.y;
+  const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+  if (lengthSquared === 0) {
+    const dx = point.x - start.x;
+    const dy = point.y - start.y;
+    return dx * dx + dy * dy;
+  }
+
+  const projection = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared,
+    ),
+  );
+  const nearestX = start.x + projection * segmentX;
+  const nearestY = start.y + projection * segmentY;
+  const dx = point.x - nearestX;
+  const dy = point.y - nearestY;
+  return dx * dx + dy * dy;
+}
+
 export function collidesWithObstacle(point: Vec2, radius: number, obstacle: Obstacle): boolean {
   return obstacle.type === 'rect'
     ? circleIntersectsRect(point, radius, obstacle)
@@ -71,11 +95,11 @@ export function getHoleCaptureStatus(
   point: Vec2,
   velocityX: number,
   velocityY: number,
+  previousPoint: Vec2 = point,
 ): HoleCaptureStatus {
-  const dx = point.x - level.hole.x;
-  const dy = point.y - level.hole.y;
   const captureRadius = level.holeRadius - Math.max(1, level.ballRadius / 2);
-  if (dx * dx + dy * dy > captureRadius * captureRadius) return 'outside';
+  const distanceSquared = distanceSquaredToSegment(level.hole, previousPoint, point);
+  if (distanceSquared > captureRadius * captureRadius) return 'outside';
   return Math.hypot(velocityX, velocityY) <= HOLE_CAPTURE_MAX_SPEED ? 'capturable' : 'too-fast';
 }
 

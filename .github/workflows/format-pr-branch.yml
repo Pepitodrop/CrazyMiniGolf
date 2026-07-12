@@ -1,0 +1,35 @@
+name: Format PR branch
+
+on:
+  push:
+    branches: [agent/release-v1.0.2-bounce-review]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/release-v1.0.2-bounce-review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run format
+      - name: Commit canonical formatting
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/collision.ts tests/collision.test.ts .github/workflows/auto-merge.yml
+          git commit -m "style: apply canonical formatting"
+          git push origin HEAD:agent/release-v1.0.2-bounce-review

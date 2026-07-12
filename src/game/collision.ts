@@ -123,17 +123,45 @@ export function calculateCollisionSensors(
 
   const xWall = nextX - level.ballRadius < 0 || nextX + level.ballRadius > level.width;
   const yWall = nextY - level.ballRadius < 0 || nextY + level.ballRadius > level.height;
-  const xObstacle = velocityX > 0 && collidesWithAnyObstacle(level, xPoint);
-  const yObstacle = velocityY > 0 && collidesWithAnyObstacle(level, yPoint);
+  const xObstacle = velocityX > 0 ? closestObstacle(level, xPoint) : null;
+  const yObstacle = velocityY > 0 ? closestObstacle(level, yPoint) : null;
   const diagonalObstacle =
-    velocityX > 0 && velocityY > 0 && !xObstacle && !yObstacle && closestObstacle(level, nextPoint);
-  const diagonalAxis = diagonalObstacle
-    ? dominantReflectionAxis(collisionNormal(nextPoint, diagonalObstacle), velocityX, velocityY)
-    : null;
+    velocityX > 0 && velocityY > 0 ? closestObstacle(level, nextPoint) : null;
 
-  const blockX = velocityX > 0 && (xWall || xObstacle || diagonalAxis === 'x');
-  const blockY = velocityY > 0 && (yWall || yObstacle || diagonalAxis === 'y');
-  const obstacleCollision = xObstacle || yObstacle || diagonalObstacle !== null;
+  let obstacleBlockX = false;
+  let obstacleBlockY = false;
+
+  if (xObstacle && yObstacle) {
+    if (xObstacle === yObstacle) {
+      const axis = dominantReflectionAxis(
+        collisionNormal(nextPoint, diagonalObstacle ?? xObstacle),
+        velocityX,
+        velocityY,
+      );
+      obstacleBlockX = axis === 'x';
+      obstacleBlockY = axis === 'y';
+    } else {
+      obstacleBlockX = true;
+      obstacleBlockY = true;
+    }
+  } else if (xObstacle) {
+    obstacleBlockX = true;
+  } else if (yObstacle) {
+    obstacleBlockY = true;
+  } else if (diagonalObstacle) {
+    const axis = dominantReflectionAxis(
+      collisionNormal(nextPoint, diagonalObstacle),
+      velocityX,
+      velocityY,
+    );
+    obstacleBlockX = axis === 'x';
+    obstacleBlockY = axis === 'y';
+  }
+
+  const blockX = velocityX > 0 && (xWall || obstacleBlockX);
+  const blockY = velocityY > 0 && (yWall || obstacleBlockY);
+  const obstacleCollision =
+    xObstacle !== null || yObstacle !== null || diagonalObstacle !== null;
 
   return {
     blockX,

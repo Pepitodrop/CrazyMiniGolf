@@ -38,10 +38,7 @@ function distanceSquaredToSegment(point: Vec2, start: Vec2, end: Vec2): number {
 
   const projection = Math.max(
     0,
-    Math.min(
-      1,
-      ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared,
-    ),
+    Math.min(1, ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared),
   );
   const nearestX = start.x + projection * segmentX;
   const nearestY = start.y + projection * segmentY;

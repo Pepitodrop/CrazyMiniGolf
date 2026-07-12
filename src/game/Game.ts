@@ -171,13 +171,17 @@ export class Game {
     this.engineBusy = true;
     try {
       const level = this.level;
+      const previousPosition = { x: this.state.x, y: this.state.y };
+      const incomingVelocityX = this.state.velocityX;
+      const incomingVelocityY = this.state.velocityY;
+      const incomingSpeed = Math.hypot(incomingVelocityX, incomingVelocityY);
       const beforeMove = getHoleCaptureStatus(
         level,
-        { x: this.state.x, y: this.state.y },
-        this.state.velocityX,
-        this.state.velocityY,
+        previousPosition,
+        incomingVelocityX,
+        incomingVelocityY,
       );
-      this.updateHoleFeedback(beforeMove);
+      this.updateHoleFeedback(beforeMove, incomingSpeed);
 
       if (beforeMove === 'capturable') {
         const capturedState = await this.executeEngine({
@@ -217,10 +221,11 @@ export class Game {
       const afterMove = getHoleCaptureStatus(
         level,
         { x: this.state.x, y: this.state.y },
-        this.state.velocityX,
-        this.state.velocityY,
+        incomingVelocityX,
+        incomingVelocityY,
+        previousPosition,
       );
-      this.updateHoleFeedback(afterMove);
+      this.updateHoleFeedback(afterMove, incomingSpeed);
       if (!this.state.levelComplete && afterMove === 'capturable') {
         const capturedState = await this.executeEngine({
           state: this.state,
@@ -264,10 +269,9 @@ export class Game {
     }
   }
 
-  private updateHoleFeedback(status: HoleCaptureStatus): void {
+  private updateHoleFeedback(status: HoleCaptureStatus, speed: number): void {
     if (status === 'too-fast') {
       if (!this.holeTooFastActive) {
-        const speed = Math.hypot(this.state.velocityX, this.state.velocityY);
         this.emit('hole speed event', () =>
           this.events.onHoleTooFast?.(speed, HOLE_CAPTURE_MAX_SPEED),
         );

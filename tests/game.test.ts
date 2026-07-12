@@ -197,14 +197,14 @@ describe('Game orchestration', () => {
     const onHoleTooFast = vi.fn();
     const { game } = createGame({ onHoleTooFast });
     const state = game.currentState;
-    state.x = game.level.hole.x;
+    state.x = game.level.hole.x - 8;
     state.y = game.level.hole.y;
-    state.velocityX = 4;
+    state.velocityX = 14;
     state.velocityY = 0;
-    state.movingValue = 4;
+    state.movingValue = 14;
     await game.advancePhysics();
     expect(onHoleTooFast).toHaveBeenCalledTimes(1);
-    expect(onHoleTooFast).toHaveBeenCalledWith(4, 2);
+    expect(onHoleTooFast).toHaveBeenCalledWith(14, 2);
     expect(game.currentState.levelComplete).toBe(false);
   });
 

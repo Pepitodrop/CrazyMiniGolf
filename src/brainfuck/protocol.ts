@@ -6,9 +6,9 @@ export const ENGINE_OUTPUT_BYTES = 15;
 export interface EngineCommand {
   state: EngineState;
   aim?: {
-    xActive: boolean;
+    velocityX: number;
     xNegative: boolean;
-    yActive: boolean;
+    velocityY: number;
     yNegative: boolean;
     strength: number;
   };
@@ -38,9 +38,9 @@ export function encodeEngineCommand(command: EngineCommand): Uint8Array {
     flag(state.velocityXNegative),
     byte(state.velocityY),
     flag(state.velocityYNegative),
-    flag(aim?.xActive),
+    byte(aim?.velocityX ?? 0),
     flag(aim?.xNegative),
-    flag(aim?.yActive),
+    byte(aim?.velocityY ?? 0),
     flag(aim?.yNegative),
     byte(aim?.strength ?? state.strength),
     byte(state.strokes),

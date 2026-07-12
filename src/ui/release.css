@@ -4,6 +4,15 @@
   font-size: 0.82rem;
 }
 
+.hole-speed {
+  color: var(--accent);
+}
+
+.hole-speed.too-fast {
+  color: #ff879d;
+  text-shadow: 0 0 12px rgba(255, 135, 157, 0.55);
+}
+
 footer nav {
   display: flex;
   flex-wrap: wrap;

@@ -32,6 +32,17 @@ jobs:
       - name: Apply source changes
         run: |
           set -o pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-gameplay-fixes.mjs')
+          source = path.read_text()
+          source = source.replace(
+              "      `Brainfuck engine returned ${output.length} bytes; expected ${ENGINE_OUTPUT_BYTES}.`,",
+              "      \\`Brainfuck engine returned ${output.length} bytes; expected ${ENGINE_OUTPUT_BYTES}.\\`,",
+          )
+          path.write_text(source)
+          PY
+          node --check scripts/apply-gameplay-fixes.mjs
           node scripts/apply-gameplay-fixes.mjs 2>&1 | tee gameplay-apply.log
       - name: Upload apply diagnostics
         if: failure()

@@ -1,0 +1,77 @@
+name: Merge reviewed validated PR
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: merge-reviewed-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0] != null
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+      VALIDATED_HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+    steps:
+      - name: Validate reviewed pull request
+        id: scope
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}")"
+          state="$(jq -r '.state' <<<"$pr_json")"
+          draft="$(jq -r '.draft' <<<"$pr_json")"
+          base="$(jq -r '.base.ref' <<<"$pr_json")"
+          head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+          head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
+
+          test "$state" = "open"
+          test "$draft" = "false"
+          test "$base" = "main"
+          test "$head_sha" = "$VALIDATED_HEAD_SHA"
+
+          if [ "$head_repo" != "$REPOSITORY" ]; then
+            echo "merge_allowed=false" >> "$GITHUB_OUTPUT"
+            echo "Fork PR detected; automatic merge is disabled."
+          else
+            echo "merge_allowed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify automated PR review exists for validated head
+        if: steps.scope.outputs.merge_allowed == 'true'
+        run: |
+          set -euo pipefail
+          reviews="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews")"
+          jq -e --arg sha "$VALIDATED_HEAD_SHA" '
+            map(
+              select(
+                .commit_id == $sha and
+                .state == "COMMENTED" and
+                .user.login == "github-actions[bot]" and
+                .body != null and
+                (.body | contains("Automated production review"))
+              )
+            )
+            | length > 0
+          ' <<<"$reviews" >/dev/null
+
+      - name: Merge unchanged reviewed PR
+        if: steps.scope.outputs.merge_allowed == 'true'
+        run: |
+          gh api --method PUT "repos/${REPOSITORY}/pulls/${PR_NUMBER}/merge" \
+            -f merge_method=merge \
+            -f sha="$VALIDATED_HEAD_SHA" \
+            -f commit_title="Merge reviewed PR #${PR_NUMBER}" \
+            -f commit_message="Merged automatically after automated PR review and complete successful CI."

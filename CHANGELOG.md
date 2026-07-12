@@ -2,6 +2,20 @@
 
 All notable changes to Crazy Mini Golf are documented here.
 
+## [1.0.2] - 2026-07-12
+
+### Fixed
+
+- Pink rectangular and circular obstacles now reflect the ball on the detected collision-normal axis instead of reversing every active component and retracing the incoming shot.
+- Added regression tests for side, diagonal-corner, circular-obstacle, wall, and fast-hole interactions.
+
+### Operations
+
+- Retained the existing automated production review for every non-draft PR revision.
+- Added automatic merging only after that review exists and the complete CI workflow succeeds.
+- Same-repository PRs are merged only when the validated head SHA is unchanged and the PR still targets `main`.
+- Fork PRs are reviewed but are never automatically merged.
+
 ## [1.0.1] - 2026-07-12
 
 ### Fixed
@@ -9,12 +23,11 @@ All notable changes to Crazy Mini Golf are documented here.
 - Added a packaged SVG favicon that works on the deployed site.
 - Unified mouse, touch, keyboard, slider, guide-line, and engine aim resolution.
 - Added five-degree angle controls with integer engine component resolution.
-- Made pink obstacle collisions reverse the complete incoming vector while outer walls retain normal axis reflection.
+- Added initial pink-obstacle collision handling while outer walls retain axis-specific reflection.
 - Added visible feedback when the ball crosses the hole above capture speed.
 
 ### Operations
 
-- Added an automated same-repository PR review workflow.
 - Kept full CI, Docker smoke tests, cross-browser E2E, R analysis, deployment, and versioned release automation.
 
 ## [1.0.0] - 2026-07-11

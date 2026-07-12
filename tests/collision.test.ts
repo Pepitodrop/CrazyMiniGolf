@@ -33,21 +33,41 @@ describe('collision adapter', () => {
     expect(sensors.collisionKind).toBe('wall');
   });
 
-  it('reverses every active component on a pink obstacle', () => {
+  it('reflects only the obstacle-normal axis for a side impact', () => {
     const sensors = calculateCollisionSensors(level, { x: 42, y: 40 }, 8, false, 3, false);
     expect(sensors.blockX).toBe(true);
-    expect(sensors.blockY).toBe(true);
+    expect(sensors.blockY).toBe(false);
     expect(sensors.collisionKind).toBe('obstacle');
   });
 
-  it('blocks both axes when a diagonal step would clip an obstacle corner', () => {
+  it('reflects one axis on a diagonal corner impact instead of retracing the shot', () => {
     const cornerLevel = {
       ...level,
       obstacles: [{ type: 'rect', x: 50, y: 50, width: 20, height: 20 }],
     } satisfies LevelDefinition;
-    const sensors = calculateCollisionSensors(cornerLevel, { x: 44, y: 44 }, 4, false, 4, false);
+    const sensors = calculateCollisionSensors(cornerLevel, { x: 44, y: 44 }, 5, false, 4, false);
+    expect(Number(sensors.blockX) + Number(sensors.blockY)).toBe(1);
+    expect(sensors.collisionKind).toBe('obstacle');
+  });
+
+  it('does not retrace when both projected axes touch the same obstacle corner', () => {
+    const cornerLevel = {
+      ...level,
+      obstacles: [{ type: 'rect', x: 50, y: 50, width: 20, height: 20 }],
+    } satisfies LevelDefinition;
+    const sensors = calculateCollisionSensors(cornerLevel, { x: 47, y: 47 }, 3, false, 3, false);
     expect(sensors.blockX).toBe(true);
-    expect(sensors.blockY).toBe(true);
+    expect(sensors.blockY).toBe(false);
+    expect(sensors.collisionKind).toBe('obstacle');
+  });
+
+  it('reflects from a circular obstacle using its dominant surface normal', () => {
+    const circleLevel = {
+      ...level,
+      obstacles: [{ type: 'circle', x: 60, y: 40, radius: 10 }],
+    } satisfies LevelDefinition;
+    const sensors = calculateCollisionSensors(circleLevel, { x: 44, y: 34 }, 5, false, 4, false);
+    expect(Number(sensors.blockX) + Number(sensors.blockY)).toBe(1);
     expect(sensors.collisionKind).toBe('obstacle');
   });
 

@@ -160,8 +160,7 @@ export function calculateCollisionSensors(
 
   const blockX = velocityX > 0 && (xWall || obstacleBlockX);
   const blockY = velocityY > 0 && (yWall || obstacleBlockY);
-  const obstacleCollision =
-    xObstacle !== null || yObstacle !== null || diagonalObstacle !== null;
+  const obstacleCollision = xObstacle !== null || yObstacle !== null || diagonalObstacle !== null;
 
   return {
     blockX,

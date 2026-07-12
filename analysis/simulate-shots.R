@@ -186,7 +186,7 @@ simulate_round <- function(level, max_strokes = 12, exploration = 0.18) {
   NA_integer_
 }
 
-analyze_level <- function(level, trials = 20) {
+analyze_level <- function(level, trials = 5) {
   samples <- replicate(trials, simulate_round(level))
   solved <- samples[!is.na(samples)]
   success_rate <- length(solved) / trials

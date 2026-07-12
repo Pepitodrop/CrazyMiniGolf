@@ -1,6 +1,6 @@
 {
   "name": "crazy-mini-golf",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "description": "A nine-hole browser minigolf game with a real Brainfuck state-transition engine.",

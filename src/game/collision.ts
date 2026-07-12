@@ -63,9 +63,8 @@ export function collidesWithAnyObstacle(level: LevelDefinition, point: Vec2): bo
 
 function closestObstacle(level: LevelDefinition, point: Vec2): Obstacle | null {
   return (
-    level.obstacles.find((obstacle) =>
-      collidesWithObstacle(point, level.ballRadius, obstacle),
-    ) ?? null
+    level.obstacles.find((obstacle) => collidesWithObstacle(point, level.ballRadius, obstacle)) ??
+    null
   );
 }
 
@@ -101,11 +100,7 @@ function collisionNormal(point: Vec2, obstacle: Obstacle): Vec2 {
     : { x: point.x - obstacle.x, y: point.y - obstacle.y };
 }
 
-function dominantReflectionAxis(
-  normal: Vec2,
-  velocityX: number,
-  velocityY: number,
-): CollisionAxis {
+function dominantReflectionAxis(normal: Vec2, velocityX: number, velocityY: number): CollisionAxis {
   const absX = Math.abs(normal.x);
   const absY = Math.abs(normal.y);
   if (absX === absY) return velocityX >= velocityY ? 'x' : 'y';
@@ -131,11 +126,7 @@ export function calculateCollisionSensors(
   const xObstacle = velocityX > 0 && collidesWithAnyObstacle(level, xPoint);
   const yObstacle = velocityY > 0 && collidesWithAnyObstacle(level, yPoint);
   const diagonalObstacle =
-    velocityX > 0 &&
-    velocityY > 0 &&
-    !xObstacle &&
-    !yObstacle &&
-    closestObstacle(level, nextPoint);
+    velocityX > 0 && velocityY > 0 && !xObstacle && !yObstacle && closestObstacle(level, nextPoint);
   const diagonalAxis = diagonalObstacle
     ? dominantReflectionAxis(collisionNormal(nextPoint, diagonalObstacle), velocityX, velocityY)
     : null;

@@ -23,7 +23,7 @@ app.innerHTML = `
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">BRAINFUCK POWERED · v1.0.1</p>
+        <p class="eyebrow">BRAINFUCK POWERED · v1.0.2</p>
         <h1>CRAZY MINI GOLF</h1>
       </div>
       <div class="top-actions">

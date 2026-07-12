@@ -1,0 +1,64 @@
+name: Apply gameplay fixes
+
+on:
+  push:
+    branches: [agent/fix-aim-bounce-hole-feedback]
+    paths:
+      - scripts/apply-gameplay-fixes.mjs
+      - .github/workflows/apply-gameplay-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-aim-bounce-hole-feedback
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply source changes
+        run: node scripts/apply-gameplay-fixes.mjs
+      - run: npm ci
+      - run: npm run generate:engine
+      - run: npm run format
+      - run: npm run audit
+      - run: npm run lint
+      - run: npm run check:engine
+      - run: npm run validate:levels
+      - run: npm run test:coverage
+      - run: npm run build
+      - name: Build and smoke-test production container
+        run: |
+          set -euo pipefail
+          docker build --tag crazy-mini-golf:gameplay-fix .
+          docker run -d --name crazy-mini-golf-gameplay-fix -p 8080:8080 crazy-mini-golf:gameplay-fix
+          trap 'docker rm -f crazy-mini-golf-gameplay-fix >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs crazy-mini-golf-gameplay-fix
+              exit 1
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
+          curl -fsS http://127.0.0.1:8080/favicon.svg | grep -q '<svg'
+      - name: Commit final source
+        run: |
+          rm -f scripts/apply-gameplay-fixes.mjs
+          rm -f .github/workflows/apply-gameplay-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: align aiming, bounce physics and hole feedback"
+          git push origin HEAD:agent/fix-aim-bounce-hole-feedback

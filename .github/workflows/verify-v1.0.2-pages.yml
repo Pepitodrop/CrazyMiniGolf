@@ -17,11 +17,16 @@ jobs:
           page_url="https://pepitodrop.github.io/CrazyMiniGolf/"
           for attempt in {1..40}; do
             html="$(curl -fsS "$page_url" || true)"
-            if grep -q 'v1.0.2' <<<"$html" && grep -q 'CRAZY MINI GOLF' <<<"$html"; then
+            asset_path="$(grep -oE '\./assets/[^" ]+\.js' <<<"$html" | head -n 1 || true)"
+            javascript=""
+            if [ -n "$asset_path" ]; then
+              javascript="$(curl -fsS "${page_url}${asset_path#./}" || true)"
+            fi
+            if grep -q 'Crazy Mini Golf' <<<"$html" && grep -q 'v1.0.2' <<<"$javascript"; then
               echo "Verified Crazy Mini Golf v1.0.2 at $page_url"
               exit 0
             fi
             sleep 5
           done
-          echo "The public Pages site did not expose v1.0.2 at $page_url" >&2
+          echo "The public Pages site did not expose the v1.0.2 bundle at $page_url" >&2
           exit 1

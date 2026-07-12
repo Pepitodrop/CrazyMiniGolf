@@ -1,0 +1,27 @@
+name: Verify deployed v1.0.2
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public Pages deployment
+        run: |
+          set -euo pipefail
+          page_url="https://pepitodrop.github.io/CrazyMiniGolf/"
+          for attempt in {1..40}; do
+            html="$(curl -fsS "$page_url" || true)"
+            if grep -q 'v1.0.2' <<<"$html" && grep -q 'CRAZY MINI GOLF' <<<"$html"; then
+              echo "Verified Crazy Mini Golf v1.0.2 at $page_url"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "The public Pages site did not expose v1.0.2 at $page_url" >&2
+          exit 1

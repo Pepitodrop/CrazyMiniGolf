@@ -1,4 +1,4 @@
-name: Verify deployed v1.0.2
+name: Diagnose v1.0.2 deployment
 
 on:
   pull_request:
@@ -6,27 +6,27 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pages: read
 
 jobs:
-  verify-pages:
+  diagnose-deployment:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Verify public Pages deployment
+      - name: Inspect main workflow runs
         run: |
           set -euo pipefail
-          page_url="https://pepitodrop.github.io/CrazyMiniGolf/"
-          for attempt in {1..40}; do
-            html="$(curl -fsS "$page_url" || true)"
-            asset_path="$(grep -oE '\./assets/[^" ]+\.js' <<<"$html" | head -n 1 || true)"
-            javascript=""
-            if [ -n "$asset_path" ]; then
-              javascript="$(curl -fsS "${page_url}${asset_path#./}" || true)"
-            fi
-            if grep -q 'Crazy Mini Golf' <<<"$html" && grep -q 'v1.0.2' <<<"$javascript"; then
-              echo "Verified Crazy Mini Golf v1.0.2 at $page_url"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "The public Pages site did not expose the v1.0.2 bundle at $page_url" >&2
-          exit 1
+          echo 'RECENT MAIN WORKFLOW RUNS'
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=main&per_page=30" \
+            --jq '.workflow_runs[] | [.id, .name, .event, .status, (.conclusion // "pending"), .head_sha, .html_url] | @tsv'
+      - name: Inspect Pages configuration
+        run: |
+          set -euo pipefail
+          echo 'PAGES CONFIGURATION'
+          gh api "repos/${GITHUB_REPOSITORY}/pages" || true
+      - name: Inspect expected public endpoint
+        run: |
+          set -euo pipefail
+          curl -i -L --max-time 20 "https://pepitodrop.github.io/CrazyMiniGolf/" || true

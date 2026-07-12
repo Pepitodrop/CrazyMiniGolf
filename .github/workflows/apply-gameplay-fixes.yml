@@ -60,7 +60,17 @@ jobs:
       - run: npm run lint
       - run: npm run check:engine
       - run: npm run validate:levels
-      - run: npm run test:coverage
+      - name: Run coverage tests
+        run: |
+          set -o pipefail
+          npm run test:coverage 2>&1 | tee gameplay-tests.log
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gameplay-test-diagnostics
+          path: gameplay-tests.log
+          retention-days: 1
       - run: npm run build
       - name: Build and smoke-test production container
         run: |
@@ -82,7 +92,7 @@ jobs:
           curl -fsS http://127.0.0.1:8080/favicon.svg | grep -q '<svg'
       - name: Commit final source
         run: |
-          rm -f gameplay-apply.log gameplay-lint.log
+          rm -f gameplay-apply.log gameplay-tests.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A

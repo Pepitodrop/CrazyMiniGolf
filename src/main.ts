@@ -23,7 +23,7 @@ app.innerHTML = `
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">BRAINFUCK POWERED · v1.0.0</p>
+        <p class="eyebrow">BRAINFUCK POWERED · v1.0.1</p>
         <h1>CRAZY MINI GOLF</h1>
       </div>
       <div class="top-actions">
@@ -39,6 +39,7 @@ app.innerHTML = `
       <div><span>STROKES</span><strong id="hud-strokes">0</strong></div>
       <div><span>TOTAL</span><strong id="hud-total">E</strong></div>
       <div><span>POWER</span><strong id="hud-power">7</strong></div>
+      <div><span>HOLE</span><strong id="hud-hole-speed" class="hole-speed">READY</strong></div>
     </section>
 
     <section class="game-grid">
@@ -58,7 +59,7 @@ app.innerHTML = `
         </section>
         <section class="mobile-controls">
           <label for="angle-control">ANGLE <output id="angle-output">0°</output></label>
-          <input id="angle-control" type="range" min="0" max="315" step="45" value="0" />
+          <input id="angle-control" type="range" min="0" max="355" step="5" value="0" />
           <label for="power-control">POWER <output id="power-output">7</output></label>
           <input id="power-control" type="range" min="2" max="14" step="1" value="7" />
           <button id="hit-button" class="primary" type="button">HIT</button>
@@ -70,7 +71,7 @@ app.innerHTML = `
         <section class="help">
           <h3>CONTROLS</h3>
           <p>Pointer/touch: aim and release. Keyboard: ←/→ angle, ↑/↓ power, Space hit, R restart, P pause.</p>
-          <p class="snap-note">Retro physics snaps shots to eight directions.</p>
+          <p class="snap-note">Aim preview and physics use the same precise 5° steps.</p>
         </section>
         <section class="highscore">
           <h3>BEST COMPLETED ROUND</h3>
@@ -104,6 +105,7 @@ const hudPar = element<HTMLElement>('#hud-par');
 const hudStrokes = element<HTMLElement>('#hud-strokes');
 const hudTotal = element<HTMLElement>('#hud-total');
 const hudPower = element<HTMLElement>('#hud-power');
+const hudHoleSpeed = element<HTMLElement>('#hud-hole-speed');
 const levelName = element<HTMLElement>('#level-name');
 const levelRule = element<HTMLElement>('#level-rule');
 const commentator = element<HTMLElement>('#commentator');
@@ -240,6 +242,10 @@ const game = new Game(canvas, levels, 1, {
   },
   onBounce() {
     trumpRuntime?.recordBounce();
+  },
+  onHoleSpeed(tooFast) {
+    hudHoleSpeed.textContent = tooFast ? 'TOO FAST' : 'READY';
+    hudHoleSpeed.classList.toggle('too-fast', tooFast);
   },
   onRoundReset() {
     sessionScores.clear();

@@ -11,9 +11,10 @@ All notable changes to Crazy Mini Golf are documented here.
 
 ### Operations
 
-- Added an automated production review for every completed PR CI run.
-- Same-repository PRs are merged only when the validated head SHA is unchanged, the PR targets `main`, the PR is not a draft, and the complete CI workflow succeeds.
-- Fork PRs receive the automated review result but are never automatically merged.
+- Retained the existing automated production review for every non-draft PR revision.
+- Added automatic merging only after that review exists and the complete CI workflow succeeds.
+- Same-repository PRs are merged only when the validated head SHA is unchanged and the PR still targets `main`.
+- Fork PRs are reviewed but are never automatically merged.
 
 ## [1.0.1] - 2026-07-12
 

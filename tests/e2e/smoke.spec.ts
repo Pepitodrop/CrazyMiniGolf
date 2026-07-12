@@ -8,7 +8,7 @@ test('loads the production game, worker and release UI', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'CRAZY MINI GOLF' })).toBeVisible();
-  await expect(page.getByText('v1.0.1')).toBeVisible();
+  await expect(page.getByText('v1.0.2')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'BEST COMPLETED ROUND' })).toBeVisible();
   await expect(page.locator('#trump-briefing-panel')).toBeVisible();
   await expect(page.locator('#hud-strokes')).toHaveText('0');

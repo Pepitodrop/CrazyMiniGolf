@@ -1,0 +1,51 @@
+name: Apply gameplay polish
+
+on:
+  push:
+    branches: [agent/gameplay-polish-v1.0.1]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gameplay-polish-v1.0.1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: node scripts/apply-gameplay-polish.mjs
+      - run: npm ci
+      - run: npm run generate:engine
+      - run: npm run format
+      - run: npm run lint
+      - run: npm run check:engine
+      - run: npm run validate:levels
+      - run: npm run test:coverage
+      - run: npm run build
+      - name: Build and smoke-test Docker image
+        run: |
+          set -euo pipefail
+          docker build -t crazy-mini-golf:polish .
+          docker run -d --name crazy-mini-golf-polish -p 8080:8080 crazy-mini-golf:polish
+          trap 'docker rm -f crazy-mini-golf-polish >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
+          curl -fsS http://127.0.0.1:8080/favicon.svg | grep -q '<svg'
+      - name: Commit validated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: polish aiming, rebounds and hole feedback"
+          git push

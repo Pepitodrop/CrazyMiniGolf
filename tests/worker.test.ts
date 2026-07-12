@@ -12,9 +12,9 @@ describe('Brainfuck worker execution', () => {
       encodeEngineCommand({
         state: createInitialState(1, { x: 24, y: 75 }),
         aim: {
-          xActive: true,
+          velocityX: 8,
           xNegative: false,
-          yActive: false,
+          velocityY: 0,
           yNegative: false,
           strength: 8,
         },

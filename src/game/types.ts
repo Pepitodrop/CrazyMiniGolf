@@ -54,6 +54,7 @@ export interface EngineState {
 export interface AimState {
   direction: Vec2;
   strength: number;
+  angleDegrees?: number;
 }
 
 export interface CollisionSensors {

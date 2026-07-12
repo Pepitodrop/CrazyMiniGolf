@@ -1,3 +1,9 @@
+import {
+  AIM_ANGLE_STEP_DEGREES,
+  createAimFromAngle,
+  MAX_SHOT_STRENGTH,
+  MIN_SHOT_STRENGTH,
+} from './aim';
 import type { AimState, Vec2 } from './types';
 
 export interface InputCallbacks {
@@ -25,7 +31,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 export class InputManager {
   private pointerId: number | null = null;
-  private keyboardAngle = 0;
+  private keyboardAngleDegrees = 0;
   private keyboardStrength = 7;
   private readonly callbacks: InputCallbacks;
   private readonly canvas: HTMLCanvasElement;
@@ -45,17 +51,15 @@ export class InputManager {
     const dx = point.x - ball.x;
     const dy = point.y - ball.y;
     const length = Math.hypot(dx, dy) || 1;
-    return {
-      direction: { x: dx / length, y: dy / length },
-      strength: clamp(Math.round(length / 7), 2, 14),
-    };
+    const angleDegrees = (Math.atan2(dy, dx) * 180) / Math.PI;
+    return createAimFromAngle(
+      angleDegrees,
+      clamp(Math.round(length / 7), MIN_SHOT_STRENGTH, MAX_SHOT_STRENGTH),
+    );
   }
 
   private currentKeyboardAim(): AimState {
-    return {
-      direction: { x: Math.cos(this.keyboardAngle), y: Math.sin(this.keyboardAngle) },
-      strength: this.keyboardStrength,
-    };
+    return createAimFromAngle(this.keyboardAngleDegrees, this.keyboardStrength);
   }
 
   private readonly pointerDown = (event: PointerEvent): void => {
@@ -63,18 +67,25 @@ export class InputManager {
     this.pointerId = event.pointerId;
     this.canvas.setPointerCapture(event.pointerId);
     const aim = this.aimFromPoint(this.callbacks.toWorld(event.clientX, event.clientY));
+    this.keyboardAngleDegrees = aim.angleDegrees ?? this.keyboardAngleDegrees;
+    this.keyboardStrength = aim.strength;
     this.callbacks.onAim(aim);
   };
 
   private readonly pointerMove = (event: PointerEvent): void => {
     if (event.pointerId !== this.pointerId || !this.callbacks.canAim()) return;
-    this.callbacks.onAim(this.aimFromPoint(this.callbacks.toWorld(event.clientX, event.clientY)));
+    const aim = this.aimFromPoint(this.callbacks.toWorld(event.clientX, event.clientY));
+    this.keyboardAngleDegrees = aim.angleDegrees ?? this.keyboardAngleDegrees;
+    this.keyboardStrength = aim.strength;
+    this.callbacks.onAim(aim);
   };
 
   private readonly pointerUp = (event: PointerEvent): void => {
     if (event.pointerId !== this.pointerId || !this.callbacks.canAim()) return;
     const aim = this.aimFromPoint(this.callbacks.toWorld(event.clientX, event.clientY));
     this.pointerId = null;
+    this.keyboardAngleDegrees = aim.angleDegrees ?? this.keyboardAngleDegrees;
+    this.keyboardStrength = aim.strength;
     this.callbacks.onAim(aim);
     this.callbacks.onStrike(aim);
   };
@@ -86,12 +97,19 @@ export class InputManager {
   private readonly keyDown = (event: KeyboardEvent): void => {
     if (isInteractiveTarget(event.target)) return;
     if (event.repeat && event.code === 'Space') return;
-    const angleStep = Math.PI / 4;
-    if (event.code === 'ArrowLeft' || event.code === 'KeyA') this.keyboardAngle -= angleStep;
-    else if (event.code === 'ArrowRight' || event.code === 'KeyD') this.keyboardAngle += angleStep;
-    else if (event.code === 'ArrowUp' || event.code === 'KeyW') this.keyboardStrength += 1;
-    else if (event.code === 'ArrowDown' || event.code === 'KeyS') this.keyboardStrength -= 1;
-    else if (event.code === 'Space') {
+    if (event.code === 'ArrowLeft' || event.code === 'KeyA') {
+      this.keyboardAngleDegrees -= AIM_ANGLE_STEP_DEGREES;
+      event.preventDefault();
+    } else if (event.code === 'ArrowRight' || event.code === 'KeyD') {
+      this.keyboardAngleDegrees += AIM_ANGLE_STEP_DEGREES;
+      event.preventDefault();
+    } else if (event.code === 'ArrowUp' || event.code === 'KeyW') {
+      this.keyboardStrength += 1;
+      event.preventDefault();
+    } else if (event.code === 'ArrowDown' || event.code === 'KeyS') {
+      this.keyboardStrength -= 1;
+      event.preventDefault();
+    } else if (event.code === 'Space') {
       event.preventDefault();
       if (this.callbacks.canAim()) this.callbacks.onStrike(this.currentKeyboardAim());
       return;
@@ -103,14 +121,16 @@ export class InputManager {
       return;
     } else return;
 
-    this.keyboardStrength = clamp(this.keyboardStrength, 2, 14);
-    this.callbacks.onAim(this.currentKeyboardAim());
+    this.keyboardStrength = clamp(this.keyboardStrength, MIN_SHOT_STRENGTH, MAX_SHOT_STRENGTH);
+    const aim = this.currentKeyboardAim();
+    this.keyboardAngleDegrees = aim.angleDegrees ?? this.keyboardAngleDegrees;
+    this.callbacks.onAim(aim);
   };
 
   setMobileAim(angleDegrees: number, strength: number): AimState {
-    this.keyboardAngle = (angleDegrees * Math.PI) / 180;
-    this.keyboardStrength = clamp(Math.round(strength), 2, 14);
-    const aim = this.currentKeyboardAim();
+    const aim = createAimFromAngle(angleDegrees, strength);
+    this.keyboardAngleDegrees = aim.angleDegrees ?? 0;
+    this.keyboardStrength = aim.strength;
     this.callbacks.onAim(aim);
     return aim;
   }

@@ -1,5 +1,8 @@
 import type { CollisionSensors, LevelDefinition, Obstacle, Vec2 } from './types';
 
+export const HOLE_CAPTURE_MAX_SPEED = 2;
+export type HoleCaptureStatus = 'outside' | 'too-fast' | 'capturable';
+
 function circleIntersectsRect(
   center: Vec2,
   radius: number,
@@ -21,6 +24,27 @@ function circleIntersectsCircle(
   const dy = center.y - obstacle.y;
   const combined = radius + obstacle.radius;
   return dx * dx + dy * dy <= combined * combined;
+}
+
+function distanceSquaredToSegment(point: Vec2, start: Vec2, end: Vec2): number {
+  const segmentX = end.x - start.x;
+  const segmentY = end.y - start.y;
+  const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+  if (lengthSquared === 0) {
+    const dx = point.x - start.x;
+    const dy = point.y - start.y;
+    return dx * dx + dy * dy;
+  }
+
+  const projection = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared),
+  );
+  const nearestX = start.x + projection * segmentX;
+  const nearestY = start.y + projection * segmentY;
+  const dx = point.x - nearestX;
+  const dy = point.y - nearestY;
+  return dx * dx + dy * dy;
 }
 
 export function collidesWithObstacle(point: Vec2, radius: number, obstacle: Obstacle): boolean {
@@ -47,27 +71,40 @@ export function calculateCollisionSensors(
   const nextY = position.y + (velocityYNegative ? -velocityY : velocityY);
   const xPoint = { x: nextX, y: position.y };
   const yPoint = { x: position.x, y: nextY };
+  const nextPoint = { x: nextX, y: nextY };
 
   const xWall = nextX - level.ballRadius < 0 || nextX + level.ballRadius > level.width;
   const yWall = nextY - level.ballRadius < 0 || nextY + level.ballRadius > level.height;
-  const xObstacle = collidesWithAnyObstacle(level, xPoint);
-  const yObstacle = collidesWithAnyObstacle(level, yPoint);
-  const diagonalObstacle =
-    velocityX > 0 && velocityY > 0 && collidesWithAnyObstacle(level, { x: nextX, y: nextY });
-  const blockX = velocityX > 0 && (xWall || xObstacle || diagonalObstacle);
-  const blockY = velocityY > 0 && (yWall || yObstacle || diagonalObstacle);
+  const obstacleCollision =
+    collidesWithAnyObstacle(level, xPoint) ||
+    collidesWithAnyObstacle(level, yPoint) ||
+    collidesWithAnyObstacle(level, nextPoint);
 
   return {
-    blockX,
-    blockY,
-    collisionKind:
-      xWall || yWall ? 'wall' : xObstacle || yObstacle || diagonalObstacle ? 'obstacle' : 'none',
+    blockX: velocityX > 0 && (xWall || obstacleCollision),
+    blockY: velocityY > 0 && (yWall || obstacleCollision),
+    collisionKind: xWall || yWall ? 'wall' : obstacleCollision ? 'obstacle' : 'none',
   };
 }
 
-export function isBallInHole(level: LevelDefinition, point: Vec2, movingValue: number): boolean {
-  const dx = point.x - level.hole.x;
-  const dy = point.y - level.hole.y;
+export function getHoleCaptureStatus(
+  level: LevelDefinition,
+  point: Vec2,
+  velocityX: number,
+  velocityY: number,
+  previousPoint: Vec2 = point,
+): HoleCaptureStatus {
   const captureRadius = level.holeRadius - Math.max(1, level.ballRadius / 2);
-  return movingValue <= 2 && dx * dx + dy * dy <= captureRadius * captureRadius;
+  const distanceSquared = distanceSquaredToSegment(level.hole, previousPoint, point);
+  if (distanceSquared > captureRadius * captureRadius) return 'outside';
+  return Math.hypot(velocityX, velocityY) <= HOLE_CAPTURE_MAX_SPEED ? 'capturable' : 'too-fast';
+}
+
+export function isBallInHole(
+  level: LevelDefinition,
+  point: Vec2,
+  velocityX: number,
+  velocityY = 0,
+): boolean {
+  return getHoleCaptureStatus(level, point, velocityX, velocityY) === 'capturable';
 }

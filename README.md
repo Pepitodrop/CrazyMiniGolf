@@ -1,6 +1,6 @@
 # Crazy Mini Golf
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 Crazy Mini Golf is a complete nine-hole browser minigolf game whose authoritative state transitions run through a real Brainfuck program. TypeScript provides safe browser integration, rendering, input, declarative geometry, persistence, and deployment tooling.
 
@@ -8,7 +8,7 @@ Crazy Mini Golf is a complete nine-hole browser minigolf game whose authoritativ
 
 - Nine increasingly difficult, declarative holes
 - Mouse, touch, and keyboard controls
-- Eight-direction retro aiming with adjustable power
+- Mouse, touch, slider, and keyboard aiming in five-degree increments
 - Integer movement, friction, rebounds, and deterministic hole capture
 - Real Brainfuck execution in a protected Web Worker
 - Local per-hole bests and a separate best completed nine-hole round
@@ -56,7 +56,7 @@ See the complete [deployment guide](docs/deployment.md).
 ## Controls
 
 - **Mouse or touch:** aim from the ball and release to strike
-- **Left/Right or A/D:** rotate aim by 45 degrees
+- **Left/Right or A/D:** rotate aim by 5 degrees
 - **Up/Down or W/S:** change power
 - **Space:** strike
 - **R:** restart the current hole
@@ -147,7 +147,7 @@ docs/              architecture, development, and deployment notes
 
 ## Known limitations
 
-- Physics deliberately uses eight directions and integer magnitudes.
+- Five-degree input angles resolve to the closest safe integer X/Y vector at the selected power.
 - Geometry sensors are calculated in TypeScript; Brainfuck performs the authoritative response.
 - Scores remain local to the current browser profile.
 - The Brainfuck stroke counter saturates at 255 because the protocol field is one byte.

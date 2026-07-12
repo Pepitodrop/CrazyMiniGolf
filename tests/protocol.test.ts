@@ -12,7 +12,7 @@ describe('engine protocol', () => {
     const state = createInitialState(1, { x: 20, y: 30 });
     const packet = encodeEngineCommand({
       state,
-      aim: { xActive: true, xNegative: false, yActive: false, yNegative: false, strength: 12 },
+      aim: { velocityX: 12, xNegative: false, velocityY: 0, yNegative: false, strength: 12 },
       strike: true,
       maxLevel: 9,
     });

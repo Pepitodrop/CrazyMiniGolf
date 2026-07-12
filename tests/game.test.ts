@@ -84,6 +84,7 @@ function createGame(overrides: Partial<GameEvents> = {}): {
     onLevelStart: vi.fn(),
     onShot: spies.onShot,
     onBounce: vi.fn(),
+    onHoleTooFast: vi.fn(),
     onRoundReset: vi.fn(),
     onLevelComplete: vi.fn(),
     onFinalComplete: spies.onFinalComplete,
@@ -127,7 +128,7 @@ describe('Game orchestration', () => {
     expect(game.currentState.levelComplete).toBe(true);
     expect(game.currentState.velocityX).toBe(0);
     expect(engine.calls).toHaveLength(2);
-    expect(engine.calls[0]?.holeSensor).toBe(false);
+    expect(engine.calls[0]?.holeSensor).toBeUndefined();
     expect(engine.calls[1]?.holeSensor).toBe(true);
   });
 
@@ -176,17 +177,35 @@ describe('Game orchestration', () => {
     );
   });
 
-  it('emits typed diagonal shot telemetry', async () => {
-    const { game, spies } = createGame();
+  it('emits resolved five-degree shot telemetry', async () => {
+    const { game, engine, spies } = createGame();
+    await game.strike({ direction: { x: 1, y: 1 }, strength: 9, angleDegrees: 35 });
+    expect(spies.onShot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        strength: 9,
+        angleDegrees: 35,
+        xActive: true,
+        yActive: true,
+        diagonal: true,
+      }),
+    );
+    expect(engine.calls.at(-1)?.aim?.velocityX).toBeGreaterThan(0);
+    expect(engine.calls.at(-1)?.aim?.velocityY).toBeGreaterThan(0);
+  });
 
-    await game.strike({ direction: { x: 1, y: 1 }, strength: 9 });
-
-    expect(spies.onShot).toHaveBeenCalledWith({
-      strength: 9,
-      xActive: true,
-      yActive: true,
-      diagonal: true,
-    });
+  it('reports a fast pass through the hole once per encounter', async () => {
+    const onHoleTooFast = vi.fn();
+    const { game } = createGame({ onHoleTooFast });
+    const state = game.currentState;
+    state.x = game.level.hole.x - 8;
+    state.y = game.level.hole.y;
+    state.velocityX = 14;
+    state.velocityY = 0;
+    state.movingValue = 14;
+    await game.advancePhysics();
+    expect(onHoleTooFast).toHaveBeenCalledTimes(1);
+    expect(onHoleTooFast).toHaveBeenCalledWith(14, 2);
+    expect(game.currentState.levelComplete).toBe(false);
   });
 
   it('isolates optional callback failures from engine failures', async () => {

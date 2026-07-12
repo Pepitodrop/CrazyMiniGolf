@@ -132,9 +132,9 @@ const CELL = {
   xNegative: 4,
   velocityY: 5,
   yNegative: 6,
-  aimXActive: 7,
+  aimVelocityX: 7,
   aimXNegative: 8,
-  aimYActive: 9,
+  aimVelocityY: 9,
   aimYNegative: 10,
   strength: 11,
   strokes: 12,
@@ -221,14 +221,10 @@ builder.ifConsume(CELL.strike, () => {
   builder.ifZeroPreserve(CELL.strokes, CELL.t0, CELL.t1, CELL.t2, () =>
     builder.add(CELL.strokes, -1),
   );
-  builder.ifConsume(CELL.aimXActive, () => {
-    builder.copyPreserve(CELL.strength, CELL.velocityX, CELL.t2);
-    builder.copyPreserve(CELL.aimXNegative, CELL.xNegative, CELL.t2);
-  });
-  builder.ifConsume(CELL.aimYActive, () => {
-    builder.copyPreserve(CELL.strength, CELL.velocityY, CELL.t2);
-    builder.copyPreserve(CELL.aimYNegative, CELL.yNegative, CELL.t2);
-  });
+  builder.copyPreserve(CELL.aimVelocityX, CELL.velocityX, CELL.t2);
+  builder.copyPreserve(CELL.aimXNegative, CELL.xNegative, CELL.t2);
+  builder.copyPreserve(CELL.aimVelocityY, CELL.velocityY, CELL.t2);
+  builder.copyPreserve(CELL.aimYNegative, CELL.yNegative, CELL.t2);
 });
 
 // Execute one deterministic integer physics tick.

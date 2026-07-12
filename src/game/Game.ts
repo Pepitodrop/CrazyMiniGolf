@@ -2,7 +2,13 @@ import { BrainfuckEngineClient } from '../brainfuck/EngineClient';
 import type { EngineCommand } from '../brainfuck/protocol';
 import { createInitialState } from '../brainfuck/protocol';
 import { AudioManager } from './AudioManager';
-import { calculateCollisionSensors, isBallInHole } from './collision';
+import { createAimFromAngle, resolveAim } from './aim';
+import {
+  calculateCollisionSensors,
+  getHoleCaptureStatus,
+  HOLE_CAPTURE_MAX_SPEED,
+  type HoleCaptureStatus,
+} from './collision';
 import { InputManager, type InputCallbacks } from './InputManager';
 import type { LevelManager } from './LevelManager';
 import { Renderer } from './Renderer';
@@ -10,6 +16,9 @@ import type { AimState, EngineState, LevelDefinition, Vec2 } from './types';
 
 export interface ShotTelemetry {
   strength: number;
+  angleDegrees: number;
+  velocityX: number;
+  velocityY: number;
   xActive: boolean;
   yActive: boolean;
   diagonal: boolean;
@@ -23,6 +32,7 @@ export interface GameEvents {
   onLevelStart?(level: LevelDefinition): void;
   onShot?(shot: ShotTelemetry): void;
   onBounce?(): void;
+  onHoleTooFast?(speed: number, maximumSpeed: number): void;
   onRoundReset?(): void;
   onLevelComplete(level: LevelDefinition, strokes: number): void;
   onFinalComplete(strokes: number): void;
@@ -66,7 +76,7 @@ export interface GameDependencies {
   cancelFrame?: (handle: number) => void;
 }
 
-const DEFAULT_AIM: AimState = { direction: { x: 1, y: 0 }, strength: 7 };
+const DEFAULT_AIM: AimState = resolveAim(createAimFromAngle(0, 7)).aim;
 
 export class Game {
   private readonly engine: GameEnginePort;
@@ -85,6 +95,7 @@ export class Game {
   private physicsCounter = 0;
   private engineBusy = false;
   private completionHandled = false;
+  private holeTooFastActive = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -160,6 +171,31 @@ export class Game {
     this.engineBusy = true;
     try {
       const level = this.level;
+      const previousPosition = { x: this.state.x, y: this.state.y };
+      const incomingVelocityX = this.state.velocityX;
+      const incomingVelocityY = this.state.velocityY;
+      const incomingSpeed = Math.hypot(incomingVelocityX, incomingVelocityY);
+      const beforeMove = getHoleCaptureStatus(
+        level,
+        previousPosition,
+        incomingVelocityX,
+        incomingVelocityY,
+      );
+      this.updateHoleFeedback(beforeMove, incomingSpeed);
+
+      if (beforeMove === 'capturable') {
+        const capturedState = await this.executeEngine({
+          state: this.state,
+          holeSensor: true,
+          maxLevel: this.levels.count,
+        });
+        if (!capturedState) return;
+        this.state = capturedState;
+        this.emitState();
+        if (this.state.levelComplete && !this.completionHandled) this.handleCompletion();
+        return;
+      }
+
       const sensors = calculateCollisionSensors(
         level,
         { x: this.state.x, y: this.state.y },
@@ -168,14 +204,8 @@ export class Game {
         this.state.velocityY,
         this.state.velocityYNegative,
       );
-      const holeSensorBeforeMove = isBallInHole(
-        level,
-        { x: this.state.x, y: this.state.y },
-        this.state.movingValue,
-      );
       this.physicsCounter += 1;
       const frictionPulse = this.physicsCounter % 3 === 0;
-
       const tickState = await this.executeEngine({
         state: this.state,
         tick: true,
@@ -183,16 +213,20 @@ export class Game {
         blockY: sensors.blockY,
         decayX: frictionPulse && this.state.velocityX > 0,
         decayY: frictionPulse && this.state.velocityY > 0,
-        holeSensor: holeSensorBeforeMove,
         maxLevel: this.levels.count,
       });
       if (!tickState) return;
 
       this.state = tickState;
-      if (
-        !this.state.levelComplete &&
-        isBallInHole(level, { x: this.state.x, y: this.state.y }, this.state.movingValue)
-      ) {
+      const afterMove = getHoleCaptureStatus(
+        level,
+        { x: this.state.x, y: this.state.y },
+        incomingVelocityX,
+        incomingVelocityY,
+        previousPosition,
+      );
+      this.updateHoleFeedback(afterMove, incomingSpeed);
+      if (!this.state.levelComplete && afterMove === 'capturable') {
         const capturedState = await this.executeEngine({
           state: this.state,
           holeSensor: true,
@@ -235,28 +269,17 @@ export class Game {
     }
   }
 
-  private quantizeAim(aim: AimState): {
-    xActive: boolean;
-    xNegative: boolean;
-    yActive: boolean;
-    yNegative: boolean;
-    strength: number;
-  } {
-    const absX = Math.abs(aim.direction.x);
-    const absY = Math.abs(aim.direction.y);
-    let xActive = absX >= 0.38;
-    let yActive = absY >= 0.38;
-    if (!xActive && !yActive) {
-      xActive = absX >= absY;
-      yActive = !xActive;
+  private updateHoleFeedback(status: HoleCaptureStatus, speed: number): void {
+    if (status === 'too-fast') {
+      if (!this.holeTooFastActive) {
+        this.emit('hole speed event', () =>
+          this.events.onHoleTooFast?.(speed, HOLE_CAPTURE_MAX_SPEED),
+        );
+      }
+      this.holeTooFastActive = true;
+      return;
     }
-    return {
-      xActive,
-      xNegative: aim.direction.x < 0,
-      yActive,
-      yNegative: aim.direction.y < 0,
-      strength: Math.max(2, Math.min(14, Math.round(aim.strength))),
-    };
+    this.holeTooFastActive = false;
   }
 
   private canAim(): boolean {
@@ -269,7 +292,7 @@ export class Game {
   }
 
   setAim(aim: AimState): void {
-    this.aim = aim;
+    this.aim = resolveAim(aim).aim;
     this.emitState();
   }
 
@@ -285,23 +308,33 @@ export class Game {
     if (!this.canAim()) return;
     this.engineBusy = true;
     try {
-      this.aim = aim;
-      const quantized = this.quantizeAim(aim);
+      const resolved = resolveAim(aim);
+      this.aim = resolved.aim;
       const nextState = await this.executeEngine({
         state: this.state,
-        aim: quantized,
+        aim: {
+          velocityX: resolved.velocityX,
+          xNegative: resolved.xNegative,
+          velocityY: resolved.velocityY,
+          yNegative: resolved.yNegative,
+          strength: resolved.aim.strength,
+        },
         strike: true,
         maxLevel: this.levels.count,
       });
       if (nextState) {
         this.state = nextState;
-        this.safeAudio('hit', () => this.audio.hit(quantized.strength));
+        this.holeTooFastActive = false;
+        this.safeAudio('hit', () => this.audio.hit(resolved.aim.strength));
         this.emit('shot telemetry', () =>
           this.events.onShot?.({
-            strength: quantized.strength,
-            xActive: quantized.xActive,
-            yActive: quantized.yActive,
-            diagonal: quantized.xActive && quantized.yActive,
+            strength: resolved.aim.strength,
+            angleDegrees: resolved.aim.angleDegrees ?? 0,
+            velocityX: resolved.velocityX,
+            velocityY: resolved.velocityY,
+            xActive: resolved.velocityX > 0,
+            yActive: resolved.velocityY > 0,
+            diagonal: resolved.velocityX > 0 && resolved.velocityY > 0,
           }),
         );
         this.emitMessage('HIT');
@@ -326,6 +359,7 @@ export class Game {
         this.completionHandled = false;
         this.paused = false;
         this.physicsCounter = 0;
+        this.holeTooFastActive = false;
         this.emit('level start', () => this.events.onLevelStart?.(this.level));
         this.emitMessage('START');
         this.emitState();
@@ -352,6 +386,7 @@ export class Game {
         this.completionHandled = false;
         this.paused = false;
         this.physicsCounter = 0;
+        this.holeTooFastActive = false;
         this.emit('level start', () => this.events.onLevelStart?.(this.level));
         this.emitMessage('START');
         this.emitState();
@@ -377,6 +412,7 @@ export class Game {
         this.state = nextState;
         this.completionHandled = false;
         this.physicsCounter = 0;
+        this.holeTooFastActive = false;
         this.emit('level start', () => this.events.onLevelStart?.(this.level));
         this.emitMessage('START');
         this.emitState();

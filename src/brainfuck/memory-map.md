@@ -8,7 +8,7 @@ The engine uses unsigned 8-bit wrapping cells. The interpreter allocates 96 cell
 |   1–2 | ballX, ballY         | Integer ball center coordinates                               |
 |   3–4 | velocityX, xNegative | X speed magnitude and sign bit                                |
 |   5–6 | velocityY, yNegative | Y speed magnitude and sign bit                                |
-|  7–10 | aim flags            | X/Y active and sign bits for the next strike                  |
+|  7–10 | aim components       | X/Y speed magnitudes and sign bits for the next strike        |
 |    11 | strength             | Strike strength, clamped by TypeScript to `2–14`              |
 |    12 | strokes              | Current level stroke count, saturating at `255`               |
 |    13 | strikeFlag           | Apply a strike when set to `1`                                |
@@ -31,6 +31,6 @@ The engine uses unsigned 8-bit wrapping cells. The interpreter allocates 96 cell
 
 ## What actually runs in Brainfuck
 
-The generated canonical Brainfuck source copies and mutates this state, applies strike strength to active axes, increments strokes with saturation at 255, performs signed integer movement, toggles velocity signs on collision sensors, suppresses penetration movement, applies friction decrements, calculates the moving value, sets hole/completion flags, resets level state, and increments the current level only below `maxLevel`. Regenerate it with `npm run generate:engine`.
+The generated canonical Brainfuck source copies and mutates this state, copies the resolved five-degree X/Y strike components, increments strokes with saturation at 255, performs signed integer movement, toggles velocity signs on collision sensors, suppresses penetration movement, applies friction decrements, calculates the moving value, sets hole/completion flags, resets level state, and increments the current level only below `maxLevel`. Regenerate it with `npm run generate:engine`.
 
-TypeScript converts browser input to compact direction flags and computes geometry sensor bits from JSON level shapes. This split keeps arbitrary rectangle/circle geometry outside the tiny language while leaving the authoritative state transition and collision response in Brainfuck.
+TypeScript snaps browser input to five-degree angles and compact integer components and computes geometry sensor bits from JSON level shapes. This split keeps arbitrary rectangle/circle geometry outside the tiny language while leaving the authoritative state transition and collision response in Brainfuck.

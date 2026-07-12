@@ -23,7 +23,7 @@ app.innerHTML = `
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">BRAINFUCK POWERED · v1.0.0</p>
+        <p class="eyebrow">BRAINFUCK POWERED · v1.0.1</p>
         <h1>CRAZY MINI GOLF</h1>
       </div>
       <div class="top-actions">
@@ -45,6 +45,7 @@ app.innerHTML = `
       <div class="canvas-card">
         <canvas id="game-canvas" aria-label="Crazy Mini Golf game board"></canvas>
         <div class="commentator" id="commentator">Loading the tremendous commentary engine…</div>
+        <div class="hole-speed-indicator" id="hole-speed-indicator" role="status" hidden></div>
         <div class="completion-actions">
           <button id="next-button" type="button" hidden>NEXT LEVEL</button>
           <button id="recover-button" class="danger" type="button" hidden>RELOAD ENGINE</button>
@@ -58,7 +59,7 @@ app.innerHTML = `
         </section>
         <section class="mobile-controls">
           <label for="angle-control">ANGLE <output id="angle-output">0°</output></label>
-          <input id="angle-control" type="range" min="0" max="315" step="45" value="0" />
+          <input id="angle-control" type="range" min="0" max="355" step="5" value="0" />
           <label for="power-control">POWER <output id="power-output">7</output></label>
           <input id="power-control" type="range" min="2" max="14" step="1" value="7" />
           <button id="hit-button" class="primary" type="button">HIT</button>
@@ -70,7 +71,7 @@ app.innerHTML = `
         <section class="help">
           <h3>CONTROLS</h3>
           <p>Pointer/touch: aim and release. Keyboard: ←/→ angle, ↑/↓ power, Space hit, R restart, P pause.</p>
-          <p class="snap-note">Retro physics snaps shots to eight directions.</p>
+          <p class="snap-note">Aim changes in 5° steps. The guide line shows the exact vector sent to the engine.</p>
         </section>
         <section class="highscore">
           <h3>BEST COMPLETED ROUND</h3>
@@ -107,6 +108,7 @@ const hudPower = element<HTMLElement>('#hud-power');
 const levelName = element<HTMLElement>('#level-name');
 const levelRule = element<HTMLElement>('#level-rule');
 const commentator = element<HTMLElement>('#commentator');
+const holeSpeedIndicator = element<HTMLElement>('#hole-speed-indicator');
 const nextButton = element<HTMLButtonElement>('#next-button');
 const recoverButton = element<HTMLButtonElement>('#recover-button');
 const pauseButton = element<HTMLButtonElement>('#pause-button');
@@ -129,6 +131,7 @@ const levelButtons = new Map<number, HTMLButtonElement>();
 let currentState: EngineState | null = null;
 let pendingCompletionMessage: string | null = null;
 let pendingFinalMessage: string | null = null;
+let holeSpeedIndicatorTimer: number | null = null;
 
 let trumpRuntime: ReturnType<typeof createTrumpRuntime> | null = null;
 try {
@@ -213,7 +216,13 @@ const game = new Game(canvas, levels, 1, {
     hudLevel.textContent = `${state.level} / ${levels.count}`;
     hudPar.textContent = String(level.par);
     hudStrokes.textContent = String(state.strokes);
-    hudPower.textContent = String(game.currentAim.strength);
+    const currentAim = game.currentAim;
+    const angle = currentAim.angleDegrees ?? 0;
+    hudPower.textContent = String(currentAim.strength);
+    angleControl.value = String(angle);
+    angleOutput.value = `${angle}°`;
+    powerControl.value = String(currentAim.strength);
+    powerOutput.value = String(currentAim.strength);
     hudTotal.textContent = totalRelativeToPar(state, level);
     levelName.textContent = level.name;
     levelRule.textContent = level.specialRule ?? `${level.obstacles.length} obstacles`;
@@ -240,6 +249,15 @@ const game = new Game(canvas, levels, 1, {
   },
   onBounce() {
     trumpRuntime?.recordBounce();
+  },
+  onHoleTooFast(speed, maximumSpeed) {
+    holeSpeedIndicator.hidden = false;
+    holeSpeedIndicator.textContent = `TOO FAST FOR THE HOLE · SPEED ${speed.toFixed(1)} · MAX ${maximumSpeed}`;
+    if (holeSpeedIndicatorTimer !== null) window.clearTimeout(holeSpeedIndicatorTimer);
+    holeSpeedIndicatorTimer = window.setTimeout(() => {
+      holeSpeedIndicator.hidden = true;
+      holeSpeedIndicatorTimer = null;
+    }, 1800);
   },
   onRoundReset() {
     sessionScores.clear();
@@ -297,7 +315,10 @@ resetProgressButton.addEventListener('click', () => {
   void game.selectLevel(1);
 });
 
-window.addEventListener('beforeunload', () => game.dispose());
+window.addEventListener('beforeunload', () => {
+  if (holeSpeedIndicatorTimer !== null) window.clearTimeout(holeSpeedIndicatorTimer);
+  game.dispose();
+});
 createLevelButtons();
 updateProgressView();
 updateMobileAim();

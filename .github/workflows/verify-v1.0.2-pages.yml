@@ -15,18 +15,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Inspect main workflow runs
+      - name: Show failed deployment logs
         run: |
           set -euo pipefail
-          echo 'RECENT MAIN WORKFLOW RUNS'
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=main&per_page=30" \
-            --jq '.workflow_runs[] | [.id, .name, .event, .status, (.conclusion // "pending"), .head_sha, .html_url] | @tsv'
-      - name: Inspect Pages configuration
+          gh run view 29209019081 --repo "$GITHUB_REPOSITORY" --log-failed || true
+      - name: Show Pages API response
         run: |
           set -euo pipefail
-          echo 'PAGES CONFIGURATION'
-          gh api "repos/${GITHUB_REPOSITORY}/pages" || true
-      - name: Inspect expected public endpoint
-        run: |
-          set -euo pipefail
-          curl -i -L --max-time 20 "https://pepitodrop.github.io/CrazyMiniGolf/" || true
+          gh api --include "repos/${GITHUB_REPOSITORY}/pages" || true

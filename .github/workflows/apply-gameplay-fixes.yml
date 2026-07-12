@@ -38,7 +38,7 @@ jobs:
           source = path.read_text()
           source = source.replace(
               "      `Brainfuck engine returned ${output.length} bytes; expected ${ENGINE_OUTPUT_BYTES}.`,",
-              "      \\`Brainfuck engine returned ${output.length} bytes; expected ${ENGINE_OUTPUT_BYTES}.\\`,",
+              "      \\`Brainfuck engine returned \\${output.length} bytes; expected \\${ENGINE_OUTPUT_BYTES}.\\`,",
           )
           path.write_text(source)
           PY

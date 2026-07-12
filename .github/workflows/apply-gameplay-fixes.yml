@@ -40,6 +40,10 @@ jobs:
               "      `Brainfuck engine returned ${output.length} bytes; expected ${ENGINE_OUTPUT_BYTES}.`,",
               "      \\`Brainfuck engine returned \\${output.length} bytes; expected \\${ENGINE_OUTPUT_BYTES}.\\`,",
           )
+          source = source.replace(
+              "expect(engine.calls[0]?.holeSensor).toBe(false);",
+              "expect(engine.calls[0]?.holeSensor).toBeUndefined();",
+          )
           path.write_text(source)
           PY
           node --check scripts/apply-gameplay-fixes.mjs

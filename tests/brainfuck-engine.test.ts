@@ -42,21 +42,21 @@ describe('Brainfuck game engine', () => {
     });
   });
 
-  it('applies a strike and increments the stroke count', () => {
+  it('applies component velocities and increments the stroke count', () => {
     const state = createInitialState(1, { x: 24, y: 75 });
     const result = execute({
       state,
-      aim: { xActive: true, xNegative: false, yActive: true, yNegative: true, strength: 9 },
+      aim: { velocityX: 8, xNegative: false, velocityY: 5, yNegative: true, strength: 9 },
       strike: true,
       maxLevel: 9,
     });
     expect(result).toMatchObject({
-      velocityX: 9,
+      velocityX: 8,
       velocityXNegative: false,
-      velocityY: 9,
+      velocityY: 5,
       velocityYNegative: true,
       strokes: 1,
-      movingValue: 18,
+      movingValue: 13,
     });
   });
 
@@ -100,7 +100,7 @@ describe('Brainfuck game engine', () => {
     const state = { ...createInitialState(1, { x: 20, y: 20 }), strokes: 255 };
     const result = execute({
       state,
-      aim: { xActive: true, xNegative: false, yActive: false, yNegative: false, strength: 5 },
+      aim: { velocityX: 5, xNegative: false, velocityY: 0, yNegative: false, strength: 5 },
       strike: true,
       maxLevel: 9,
     });

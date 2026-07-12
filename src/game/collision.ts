@@ -3,6 +3,8 @@ import type { CollisionSensors, LevelDefinition, Obstacle, Vec2 } from './types'
 export const HOLE_CAPTURE_MAX_SPEED = 2;
 export type HoleCaptureStatus = 'outside' | 'too-fast' | 'capturable';
 
+type CollisionAxis = 'x' | 'y';
+
 function circleIntersectsRect(
   center: Vec2,
   radius: number,
@@ -59,6 +61,57 @@ export function collidesWithAnyObstacle(level: LevelDefinition, point: Vec2): bo
   );
 }
 
+function closestObstacle(level: LevelDefinition, point: Vec2): Obstacle | null {
+  return (
+    level.obstacles.find((obstacle) =>
+      collidesWithObstacle(point, level.ballRadius, obstacle),
+    ) ?? null
+  );
+}
+
+function rectangleCollisionNormal(
+  point: Vec2,
+  obstacle: Extract<Obstacle, { type: 'rect' }>,
+): Vec2 {
+  const nearestX = Math.max(obstacle.x, Math.min(point.x, obstacle.x + obstacle.width));
+  const nearestY = Math.max(obstacle.y, Math.min(point.y, obstacle.y + obstacle.height));
+  let normalX = point.x - nearestX;
+  let normalY = point.y - nearestY;
+
+  if (normalX === 0 && normalY === 0) {
+    const distances = [
+      { axis: 'x' as const, value: Math.abs(point.x - obstacle.x), sign: -1 },
+      { axis: 'x' as const, value: Math.abs(obstacle.x + obstacle.width - point.x), sign: 1 },
+      { axis: 'y' as const, value: Math.abs(point.y - obstacle.y), sign: -1 },
+      { axis: 'y' as const, value: Math.abs(obstacle.y + obstacle.height - point.y), sign: 1 },
+    ];
+    const nearestSide = distances.reduce((best, candidate) =>
+      candidate.value < best.value ? candidate : best,
+    );
+    normalX = nearestSide.axis === 'x' ? nearestSide.sign : 0;
+    normalY = nearestSide.axis === 'y' ? nearestSide.sign : 0;
+  }
+
+  return { x: normalX, y: normalY };
+}
+
+function collisionNormal(point: Vec2, obstacle: Obstacle): Vec2 {
+  return obstacle.type === 'rect'
+    ? rectangleCollisionNormal(point, obstacle)
+    : { x: point.x - obstacle.x, y: point.y - obstacle.y };
+}
+
+function dominantReflectionAxis(
+  normal: Vec2,
+  velocityX: number,
+  velocityY: number,
+): CollisionAxis {
+  const absX = Math.abs(normal.x);
+  const absY = Math.abs(normal.y);
+  if (absX === absY) return velocityX >= velocityY ? 'x' : 'y';
+  return absX > absY ? 'x' : 'y';
+}
+
 export function calculateCollisionSensors(
   level: LevelDefinition,
   position: Vec2,
@@ -75,14 +128,25 @@ export function calculateCollisionSensors(
 
   const xWall = nextX - level.ballRadius < 0 || nextX + level.ballRadius > level.width;
   const yWall = nextY - level.ballRadius < 0 || nextY + level.ballRadius > level.height;
-  const obstacleCollision =
-    collidesWithAnyObstacle(level, xPoint) ||
-    collidesWithAnyObstacle(level, yPoint) ||
-    collidesWithAnyObstacle(level, nextPoint);
+  const xObstacle = velocityX > 0 && collidesWithAnyObstacle(level, xPoint);
+  const yObstacle = velocityY > 0 && collidesWithAnyObstacle(level, yPoint);
+  const diagonalObstacle =
+    velocityX > 0 &&
+    velocityY > 0 &&
+    !xObstacle &&
+    !yObstacle &&
+    closestObstacle(level, nextPoint);
+  const diagonalAxis = diagonalObstacle
+    ? dominantReflectionAxis(collisionNormal(nextPoint, diagonalObstacle), velocityX, velocityY)
+    : null;
+
+  const blockX = velocityX > 0 && (xWall || xObstacle || diagonalAxis === 'x');
+  const blockY = velocityY > 0 && (yWall || yObstacle || diagonalAxis === 'y');
+  const obstacleCollision = xObstacle || yObstacle || diagonalObstacle !== null;
 
   return {
-    blockX: velocityX > 0 && (xWall || obstacleCollision),
-    blockY: velocityY > 0 && (yWall || obstacleCollision),
+    blockX,
+    blockY,
     collisionKind: xWall || yWall ? 'wall' : obstacleCollision ? 'obstacle' : 'none',
   };
 }

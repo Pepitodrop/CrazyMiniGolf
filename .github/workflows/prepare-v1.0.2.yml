@@ -1,0 +1,74 @@
+name: Prepare v1.0.2
+
+on:
+  push:
+    branches: [agent/release-v1.0.2-bounce-review]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/release-v1.0.2-bounce-review
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Set patch version consistently
+        run: |
+          npm version 1.0.2 --no-git-tag-version
+          node <<'NODE'
+          const fs = require('node:fs');
+          const replacements = [
+            ['src/main.ts', /v1\.0\.1/g, 'v1.0.2'],
+            ['README.md', /\*\*Version 1\.0\.1\*\*/g, '**Version 1.0.2**'],
+            ['public/privacy.html', /Version 1\.0\.1/g, 'Version 1.0.2'],
+            ['public/legal.html', /Version 1\.0\.1/g, 'Version 1.0.2'],
+          ];
+          for (const [path, pattern, replacement] of replacements) {
+            if (!fs.existsSync(path)) continue;
+            fs.writeFileSync(path, fs.readFileSync(path, 'utf8').replace(pattern, replacement));
+          }
+          NODE
+      - run: npm ci
+      - run: npm run audit
+      - run: npm run format
+      - run: npm run lint
+      - run: npm run check:engine
+      - run: npm run validate:levels
+      - run: npm run test:coverage
+      - run: npm run build
+      - name: Build and smoke-test production Docker image
+        run: |
+          set -euo pipefail
+          docker build --tag crazy-mini-golf:v1.0.2 .
+          docker run -d --name crazy-mini-golf-v102 -p 8080:8080 crazy-mini-golf:v1.0.2
+          trap 'docker rm -f crazy-mini-golf-v102 >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs crazy-mini-golf-v102
+              exit 1
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
+          curl -fsS http://127.0.0.1:8080/favicon.svg | grep -q '<svg'
+          curl -fsSI http://127.0.0.1:8080/ | grep -qi '^content-security-policy:'
+      - name: Commit validated release candidate
+        run: |
+          rm -f .github/workflows/prepare-v1.0.2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "release: prepare Crazy Mini Golf v1.0.2"
+          git push

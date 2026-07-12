@@ -1,4 +1,4 @@
-name: Apply gameplay polish
+name: Finalize gameplay polish
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  finalize:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -21,7 +21,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: node scripts/apply-gameplay-polish.mjs
       - run: npm ci
       - run: npm run generate:engine
       - run: npm run format
@@ -42,8 +41,10 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8080/ | grep -q 'Crazy Mini Golf'
           curl -fsS http://127.0.0.1:8080/favicon.svg | grep -q '<svg'
-      - name: Commit validated changes
+      - name: Commit generated and formatted release state
         run: |
+          rm -f scripts/apply-gameplay-polish.mjs
+          rm -f .github/workflows/apply-gameplay-polish.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A

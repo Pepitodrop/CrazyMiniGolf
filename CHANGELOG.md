@@ -2,6 +2,21 @@
 
 All notable changes to Crazy Mini Golf are documented here.
 
+## [1.0.1] - 2026-07-12
+
+### Fixed
+
+- Added a packaged SVG favicon that works on the deployed site.
+- Unified mouse, touch, keyboard, slider, guide-line, and engine aim resolution.
+- Added five-degree angle controls with integer engine component resolution.
+- Made pink obstacle collisions reverse the complete incoming vector while outer walls retain normal axis reflection.
+- Added visible feedback when the ball crosses the hole above capture speed.
+
+### Operations
+
+- Added an automated same-repository PR review workflow.
+- Kept full CI, Docker smoke tests, cross-browser E2E, R analysis, deployment, and versioned release automation.
+
 ## [1.0.0] - 2026-07-11
 
 ### Added

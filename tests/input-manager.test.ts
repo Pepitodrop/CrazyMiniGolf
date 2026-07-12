@@ -31,8 +31,9 @@ describe('InputManager', () => {
     expect(onAim).toHaveBeenCalled();
     const shot = onStrike.mock.calls[0]?.[0] as AimState | undefined;
     expect(shot?.strength).toBe(8);
-    expect(shot?.direction.x).toBeCloseTo(Math.SQRT1_2);
-    expect(shot?.direction.y).toBeCloseTo(Math.SQRT1_2);
+    expect(shot?.angleDegrees).toBe(5);
+    expect(shot?.direction.x).toBeCloseTo(Math.cos((5 * Math.PI) / 180));
+    expect(shot?.direction.y).toBeCloseTo(Math.sin((5 * Math.PI) / 180));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(onPause).toHaveBeenCalledTimes(1);
     manager.dispose();
@@ -93,7 +94,11 @@ describe('InputManager', () => {
     canvas.dispatchEvent(down);
     canvas.dispatchEvent(up);
 
-    expect(onStrike).toHaveBeenCalledWith({ direction: { x: 1, y: 0 }, strength: 14 });
+    expect(onStrike).toHaveBeenCalledWith({
+      angleDegrees: 0,
+      direction: { x: 1, y: 0 },
+      strength: 14,
+    });
     manager.dispose();
   });
 });

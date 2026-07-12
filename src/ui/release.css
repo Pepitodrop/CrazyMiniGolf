@@ -31,3 +31,17 @@ footer nav a {
     justify-content: flex-start;
   }
 }
+
+.hole-speed-indicator {
+  margin-top: 0.6rem;
+  border: 1px solid #ff879d;
+  border-radius: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  color: #fff1f4;
+  background: rgba(190, 24, 93, 0.2);
+  font:
+    700 0.78rem/1.35 ui-monospace,
+    monospace;
+  letter-spacing: 0.04em;
+  text-align: center;
+}

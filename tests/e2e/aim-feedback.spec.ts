@@ -5,7 +5,10 @@ test('uses five-degree angle controls and shows hole-speed feedback markup', asy
   const angle = page.locator('#angle-control');
   await expect(angle).toHaveAttribute('step', '5');
   await expect(angle).toHaveAttribute('max', '355');
-  await angle.fill('35');
+  await angle.evaluate((element: HTMLInputElement) => {
+    element.value = '35';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await expect(page.locator('#angle-output')).toHaveText('35°');
   await expect(page.locator('#hole-speed-indicator')).toBeHidden();
 });

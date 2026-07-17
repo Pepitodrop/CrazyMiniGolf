@@ -1,5 +1,7 @@
 # Crazy Mini Golf
 
+Play this game online at **[game.luisbenedikt.de](https://game.luisbenedikt.de/)**.
+
 **Version 1.0.2**
 
 Crazy Mini Golf is a complete nine-hole browser minigolf game whose authoritative state transitions run through a real Brainfuck program. TypeScript provides safe browser integration, rendering, input, declarative geometry, persistence, and deployment tooling.

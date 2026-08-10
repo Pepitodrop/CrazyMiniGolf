@@ -1,6 +1,7 @@
 import type { SavedProgress, ScoreEntry } from '../game/types';
 
 const STORAGE_KEY = 'crazy-mini-golf-progress-v1';
+const MAX_LEVEL = 9;
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -30,22 +31,27 @@ function browserStorage(): StorageLike | null {
   }
 }
 
-function validScoreEntries(value: unknown): ScoreEntry[] {
-  if (!Array.isArray(value)) return [];
-  const entries = value.filter(
-    (entry): entry is ScoreEntry =>
-      typeof entry === 'object' &&
-      entry !== null &&
-      Number.isInteger((entry as ScoreEntry).levelId) &&
-      (entry as ScoreEntry).levelId >= 1 &&
-      (entry as ScoreEntry).levelId <= 9 &&
-      Number.isInteger((entry as ScoreEntry).bestStrokes) &&
-      (entry as ScoreEntry).bestStrokes >= 0 &&
-      Number.isInteger((entry as ScoreEntry).par) &&
-      (entry as ScoreEntry).par > 0,
-  );
+function uniqueSortedScores(entries: ScoreEntry[]): ScoreEntry[] {
   return [...new Map(entries.map((entry) => [entry.levelId, entry])).values()].sort(
     (a, b) => a.levelId - b.levelId,
+  );
+}
+
+function validScoreEntries(value: unknown): ScoreEntry[] {
+  if (!Array.isArray(value)) return [];
+  return uniqueSortedScores(
+    value.filter(
+      (entry): entry is ScoreEntry =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        Number.isInteger((entry as ScoreEntry).levelId) &&
+        (entry as ScoreEntry).levelId >= 1 &&
+        (entry as ScoreEntry).levelId <= MAX_LEVEL &&
+        Number.isInteger((entry as ScoreEntry).bestStrokes) &&
+        (entry as ScoreEntry).bestStrokes >= 0 &&
+        Number.isInteger((entry as ScoreEntry).par) &&
+        (entry as ScoreEntry).par > 0,
+    ),
   );
 }
 
@@ -55,6 +61,10 @@ function validOptionalScore(value: unknown): number | null {
     : null;
 }
 
+function normalizeUnlockedLevel(value: unknown): number {
+  return Math.max(1, Math.min(MAX_LEVEL, Number(value) || 1));
+}
+
 export function loadProgress(storage: StorageLike | null = browserStorage()): SavedProgress {
   try {
     if (!storage) return emptyProgress();
@@ -62,7 +72,7 @@ export function loadProgress(storage: StorageLike | null = browserStorage()): Sa
     if (!raw) return emptyProgress();
     const parsed = JSON.parse(raw) as Partial<SavedProgress> | LegacyProgress;
     const scores = validScoreEntries(parsed.scores);
-    const unlockedLevel = Math.max(1, Math.min(9, Number(parsed.unlockedLevel) || 1));
+    const unlockedLevel = normalizeUnlockedLevel(parsed.unlockedLevel);
 
     if (parsed.version === 2) {
       return {
@@ -117,19 +127,17 @@ export function recordLevelScore(
           : entry,
       )
     : [...progress.scores, { levelId, bestStrokes: strokes, par }];
-  const uniqueScores = [...new Map(scores.map((entry) => [entry.levelId, entry])).values()].sort(
-    (a, b) => a.levelId - b.levelId,
-  );
+  const normalizedScores = uniqueSortedScores(scores);
   const combinedHoleBests =
-    uniqueScores.length === 9
-      ? uniqueScores.reduce((sum, entry) => sum + entry.bestStrokes, 0)
+    normalizedScores.length === MAX_LEVEL
+      ? normalizedScores.reduce((sum, entry) => sum + entry.bestStrokes, 0)
       : progress.combinedHoleBests;
 
   return {
     ...progress,
     version: 2,
-    unlockedLevel: Math.min(9, Math.max(progress.unlockedLevel, levelId + 1)),
-    scores: uniqueScores,
+    unlockedLevel: Math.min(MAX_LEVEL, Math.max(progress.unlockedLevel, levelId + 1)),
+    scores: normalizedScores,
     combinedHoleBests,
   };
 }

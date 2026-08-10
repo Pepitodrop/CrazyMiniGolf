@@ -1,0 +1,47 @@
+name: Refresh dependency lock
+
+on:
+  push:
+    branches:
+      - refactor/maintainability-cleanup
+    paths:
+      - .github/workflows/refresh-dependency-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/maintainability-cleanup
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Refresh vulnerable transitive dependencies
+        run: npm audit fix --package-lock-only --ignore-scripts || true
+
+      - name: Validate deterministic install
+        run: npm ci
+
+      - name: Verify audit gate
+        run: npm run audit
+
+      - name: Commit refreshed lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "Lockfile already clean; nothing to commit."
+          else
+            git commit -m "chore: refresh vulnerable transitive dependencies"
+            git push origin HEAD:refactor/maintainability-cleanup
+          fi

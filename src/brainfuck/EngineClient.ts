@@ -18,6 +18,9 @@ interface PendingRequest {
 const createDefaultWorker = (): WorkerLike =>
   new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 
+const asError = (error: unknown, fallback: string): Error =>
+  error instanceof Error ? error : new Error(fallback);
+
 export class BrainfuckEngineClient {
   private readonly worker: WorkerLike;
   private nextId = 1;
@@ -30,18 +33,18 @@ export class BrainfuckEngineClient {
   ) {
     this.worker = workerFactory();
     this.worker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
-      const request = this.pending.get(event.data.id);
+      const request = this.takePending(event.data.id);
       if (!request) return;
-      clearTimeout(request.timeoutId);
-      this.pending.delete(event.data.id);
+
       if (event.data.error || !event.data.output) {
         request.reject(new Error(event.data.error ?? 'Brainfuck engine returned no output.'));
         return;
       }
+
       try {
         request.resolve(decodeEngineOutput(event.data.output));
       } catch (error) {
-        request.reject(error instanceof Error ? error : new Error('Invalid Brainfuck output.'));
+        request.reject(asError(error, 'Invalid Brainfuck output.'));
       }
     });
     this.worker.addEventListener('error', (event) => {
@@ -55,19 +58,21 @@ export class BrainfuckEngineClient {
     const id = this.nextId;
     this.nextId += 1;
     const input = encodeEngineCommand(command);
+
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`Brainfuck worker did not respond within ${this.requestTimeoutMs} ms.`));
+        this.takePending(id)?.reject(
+          new Error(`Brainfuck worker did not respond within ${this.requestTimeoutMs} ms.`),
+        );
       }, this.requestTimeoutMs);
+
       this.pending.set(id, { resolve, reject, timeoutId });
       const message: WorkerRequest = { id, input };
+
       try {
         this.worker.postMessage(message, { transfer: [input.buffer] });
       } catch (error) {
-        clearTimeout(timeoutId);
-        this.pending.delete(id);
-        reject(error instanceof Error ? error : new Error('Brainfuck worker request failed.'));
+        this.takePending(id)?.reject(asError(error, 'Brainfuck worker request failed.'));
       }
     });
   }
@@ -77,6 +82,15 @@ export class BrainfuckEngineClient {
     this.disposed = true;
     this.worker.terminate();
     this.rejectAll(new Error('Brainfuck engine was disposed.'));
+  }
+
+  private takePending(id: number): PendingRequest | undefined {
+    const request = this.pending.get(id);
+    if (!request) return undefined;
+
+    clearTimeout(request.timeoutId);
+    this.pending.delete(id);
+    return request;
   }
 
   private rejectAll(error: Error): void {
